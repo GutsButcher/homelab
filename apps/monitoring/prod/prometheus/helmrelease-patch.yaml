@@ -1,0 +1,14 @@
+apiVersion: helm.toolkit.fluxcd.io/v2beta1
+kind: HelmRelease
+metadata:
+  name: kube-prometheus-stack
+  namespace: monitoring
+spec:
+  values:
+    
+    grafana:
+      # Enable Grafana for prod
+      enabled: true
+    # Enable alertmanager for prod
+    alertmanager:
+      enabled: true 
