@@ -7,7 +7,7 @@ spec:
   entryPoints:
     - web
   routes:
-    - match: Host(`grafana.gwynbliedd.com`) || Host(`monitoring.gwynbliedd.com`)
+    - match: Host(`grafana.gwynbliedd.com`) || Host(`monitor.gwynbliedd.com`)
       kind: Rule
       services:
         - name: kube-prometheus-stack-grafana
