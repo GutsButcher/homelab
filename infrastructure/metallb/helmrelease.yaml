@@ -14,13 +14,6 @@ spec:
         name: metallb
         namespace: flux-system
       interval: 12h
-  crds: CreateReplace #add this line for avoinding pool CRs waiting for CRDs issue
-  install:
-    remediation:
-      retries: -1 #keep retrying indefinitely on install failures
-  upgrade:
-    remediation:
-      retries: -1 #keep retrying indefinitely on install failures
   values:
     controller:
       nodeSelector:
