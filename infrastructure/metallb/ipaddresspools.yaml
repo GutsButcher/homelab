@@ -1,0 +1,38 @@
+apiVersion: metallb.io/v1beta1
+kind: IPAddressPool
+metadata:
+  name: traefik-pool
+  namespace: metallb-system
+spec:
+  addresses:
+  - 192.168.100.210/32
+  autoAssign: false  # Only assign when explicitly requested
+---
+apiVersion: metallb.io/v1beta1
+kind: IPAddressPool
+metadata:
+  name: general-pool
+  namespace: metallb-system
+spec:
+  addresses:
+  - 192.168.100.211/32
+  - 192.168.100.211-192.168.100.225
+  autoAssign: true
+---
+apiVersion: metallb.io/v1beta1
+kind: L2Advertisement
+metadata:
+  name: traefik-l2
+  namespace: metallb-system
+spec:
+  ipAddressPools:
+  - traefik-pool
+---
+apiVersion: metallb.io/v1beta1
+kind: L2Advertisement
+metadata:
+  name: general-l2
+  namespace: metallb-system
+spec:
+  ipAddressPools:
+  - general-pool
