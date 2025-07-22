@@ -1,0 +1,17 @@
+apiVersion: helm.toolkit.fluxcd.io/v2beta1
+kind: HelmRelease
+metadata:
+  name: homepage
+  namespace: homepage
+spec:
+  values:
+    service:
+      main:
+        type: ClusterIP
+        ports:
+          http:
+            port: 3000
+    # keep your allowed hosts
+    env:
+      - name: HOMEPAGE_ALLOWED_HOSTS
+        value: "gwynbliedd.com,home.gwynbliedd.com,homepage.gwynbliedd.com"
