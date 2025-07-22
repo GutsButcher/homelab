@@ -14,10 +14,3 @@ spec:
         name: metallb
         namespace: flux-system
       interval: 12h
-  values:
-    controller:
-      nodeSelector:
-        kubernetes.io/os: linux
-    speaker:
-      nodeSelector:
-        kubernetes.io/os: linux
