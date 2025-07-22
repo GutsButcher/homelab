@@ -14,5 +14,3 @@ spec:
           port: 3000
       middlewares:
         - name: basic-auth
-          namespace: default
-        
