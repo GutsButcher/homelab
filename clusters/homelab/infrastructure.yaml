@@ -11,9 +11,3 @@ spec:
   path: "./infrastructure"
   prune: true
   wait: true
-  healthChecks:
-    # Add health checks for other critical infrastructure components if desired
-    # - apiVersion: ...
-  dependsOn: # <<<<<<<<<<<<<<<<<<<<< THE KEY ADDITION
-    - name: infrastructure-crd
-      namespace: flux-system # Ensure this namespace matches your infrastructure-crd Kustomization
