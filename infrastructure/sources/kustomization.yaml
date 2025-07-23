@@ -5,3 +5,4 @@ resources:
   - jameswynn-homepage.yaml
   - metallb.yaml
   - jenkins.yaml
+  - gwent-game.yaml
