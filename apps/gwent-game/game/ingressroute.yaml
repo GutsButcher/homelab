@@ -1,8 +1,8 @@
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
 metadata:
-  name: homepage
-  namespace: homepage
+  name: gwent-game
+  namespace: games
 spec:
   entryPoints:
     - web
@@ -10,5 +10,5 @@ spec:
     - match: Host(`gwent.gwynbliedd.com`)
       kind: Rule
       services:
-        - name: homepage
+        - name: gwent-game-service
           port: 80
