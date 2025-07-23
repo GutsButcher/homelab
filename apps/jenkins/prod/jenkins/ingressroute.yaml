@@ -10,5 +10,5 @@ spec:
     - match: Host(`jenkins.gwynbliedd.com`)
       kind: Rule
       services:
-        - name: jenkins-jenkins
+        - name: jenkins
           port: 8080
