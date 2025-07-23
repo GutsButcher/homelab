@@ -35,6 +35,9 @@ spec:
             - Homepage:
                 - abbr: HP
                   href: https://gethomepage.dev/configs/
+            - Dashboard Icons:
+                - abbr: Icons
+                  href: https://gethomepage.dev/configs/
             - Github:
                 - abbr: GH
                   href: https://github.com/GutsButcher?tab=repositories
