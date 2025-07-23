@@ -4,3 +4,4 @@ resources:
   - prometheus-community.yaml
   - jameswynn-homepage.yaml
   - metallb.yaml
+  - jenkins.yaml
