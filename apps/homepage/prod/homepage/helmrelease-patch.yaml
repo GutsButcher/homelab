@@ -5,6 +5,16 @@ metadata:
   namespace: homepage
 spec:
   values:
+    # Enable RBAC. RBAC is necessary to use Kubernetes integration
+    enableRbac: true
+
+    serviceAccount:
+      # Specify a different service account name. When blank it will default to the release
+      # name if *create* is enabled, otherwise it will refer to the default service account.
+      name: "homepage-sa"
+      # Create service account. Needed when RBAC is enabled.
+      create: true
+    
     service:
       main:
         type: ClusterIP
@@ -31,11 +41,11 @@ spec:
             - Kubernetes Docs:
                 - abbr: K8
                   href: https://kubernetes.io/docs/home/
-            - Bash Docs:
-                - abbr: Sh
+            - Bash Cheatsheet:
+                - abbr: SH
                   href: https://learnxinyminutes.com/bash/
             - Go Docs:
-                - abbr: Go
+                - abbr: GO
                   href: https://go.dev/doc/
             
 
