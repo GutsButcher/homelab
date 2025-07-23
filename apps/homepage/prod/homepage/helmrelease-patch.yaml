@@ -15,3 +15,105 @@ spec:
     env:
       - name: HOMEPAGE_ALLOWED_HOSTS
         value: "gwynbliedd.com,home.gwynbliedd.com,homepage.gwynbliedd.com"
+
+    # All the config files for Homepage can be specified under their relevant config block.
+    config:
+      # To use an existing ConfigMap uncomment this line and specify the name
+      # useExistingConfigMap: existing-homepage-configmap
+      bookmarks:
+        - Developer:
+            - Github:
+                - abbr: GH
+                  href: https://github.com/GutsButcher?tab=repositories
+            - GitLab:
+                - abbr: GL
+                  href: https://gitlab.com/gwynbliedd1
+            - Kubernetes Docs:
+                - abbr: K8
+                  href: https://kubernetes.io/docs/home/
+            - Bash Docs:
+                - abbr: Sh
+                  href: https://learnxinyminutes.com/bash/
+            - Go Docs:
+                - abbr: Go
+                  href: https://go.dev/doc/
+            
+
+      services:
+        - Infrastructure:
+            - Grafana Dashboards:
+                href: https://grafana.gwynbliedd.com/
+                description: monitor infrastructure
+
+        - DevOps Tools:
+            - Jenkins:
+                href: https://jenkins.gwynbliedd.com/
+                description: jenkins server
+            - Ansible:
+                href: https://awx.gwynbliedd.com/
+                description: Ansible AWX server
+
+        - Other:
+            - CommaFeed:
+                href: https://feed.gwynbliedd.com/
+                description: Homepage is 😎
+      widgets:
+        - resources:
+            # change backend to 'kubernetes' to use Kubernetes integration. Requires RBAC.
+            backend: kubernetes
+            expanded: true
+            cpu: true
+            memory: true
+        - search:
+            provider: duckduckgo
+            target: _blank
+        # Uncomment to enable Kubernetes integration
+        - kubernetes:
+            cluster:
+              show: true
+              cpu: true
+              memory: true
+              showLabel: true
+              label: "cluster"
+            nodes:
+              show: true
+              cpu: true
+              memory: true
+              showLabel: true
+      kubernetes:
+        # change mode to 'cluster' to use RBAC service account
+        mode: cluster
+        # Uncomment to enable gateway api HttpRoute discovery.
+        #gateway: true
+      docker:
+      settings:
+
+      # all sections can alternately be appended with "String" such as this example settings. This is useful
+      # for defining a stable ordering. Unfortunately Go's (and therefore Helm's) toYaml function sorts keys
+      # and loses and input ordering. Using a string is the best way around this.
+      settingsString: |
+        title: Homepage
+        headerStyle: boxed
+        layout:
+          Infrastructure:
+          DevOps Tools:
+          Other:
+
+    # -- Main environment variables. Template enabled.
+    # Syntax options:
+    # A) TZ: UTC
+    # B) PASSWD: '{{ .Release.Name }}'
+    # C) PASSWD:
+    #      configMapKeyRef:
+    #        name: config-map-name
+    #        key: key-name
+    # D) PASSWD:
+    #      valueFrom:
+    #        secretKeyRef:
+    #          name: secret-name
+    #          key: key-name
+    #      ...
+    # E) - name: TZ
+    #      value: UTC
+    # F) - name: TZ
+    #      value: '{{ .Release.Name }}'
