@@ -32,6 +32,9 @@ spec:
       # useExistingConfigMap: existing-homepage-configmap
       bookmarks:
         - Developer:
+            - Homepage:
+                - abbr: HP
+                  href: https://gethomepage.dev/configs/
             - Github:
                 - abbr: GH
                   href: https://github.com/GutsButcher?tab=repositories
@@ -54,19 +57,23 @@ spec:
             - Grafana Dashboards:
                 href: https://grafana.gwynbliedd.com/
                 description: monitor infrastructure
+                icon: grafana
 
         - DevOps Tools:
             - Jenkins:
                 href: https://jenkins.gwynbliedd.com/
                 description: jenkins server
+                icon: jenkins
             - Ansible:
                 href: https://awx.gwynbliedd.com/
                 description: Ansible AWX server
+                icon: ansible
 
         - Other:
             - CommaFeed:
                 href: https://feed.gwynbliedd.com/
-                description: Homepage is 😎
+                description: CommaFeed RSS reader
+                icon: commafeed
       widgets:
         - resources:
             # change backend to 'kubernetes' to use Kubernetes integration. Requires RBAC.
