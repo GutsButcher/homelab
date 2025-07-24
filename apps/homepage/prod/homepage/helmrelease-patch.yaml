@@ -141,3 +141,13 @@ spec:
     #      value: UTC
     # F) - name: TZ
     #      value: '{{ .Release.Name }}'
+    persistence:
+      logs:
+        enabled: true
+        type: emptyDir
+        mountPath: /app/config/logs
+      icons:
+        enabled: true
+        type: pvc
+        existingClaim: homepage-icons-pvc
+        mountPath: /app/public/icons
