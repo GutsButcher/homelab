@@ -1,0 +1,16 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: homepage
+spec:
+  template:
+    spec:
+      containers:
+      - name: homepage
+        volumeMounts:
+        - name: homepage-icons
+          mountPath: /app/public/icons
+      volumes:
+      - name: homepage-icons
+        persistentVolumeClaim:
+          claimName: homepage-icons-pvc

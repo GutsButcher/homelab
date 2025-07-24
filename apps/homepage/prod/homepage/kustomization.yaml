@@ -3,6 +3,8 @@ kind: Kustomization
 resources:
   - ../../base
   - ingressroute.yaml
+  - pvc-icons.yaml
 
 patchesStrategicMerge:
   - helmrelease-patch.yaml
+  - deployment-patch.yaml

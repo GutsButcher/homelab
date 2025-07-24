@@ -77,6 +77,10 @@ spec:
                 href: https://feed.gwynbliedd.com/
                 description: CommaFeed RSS reader
                 icon: commafeed
+            - Gwent:
+                href: https://gwent.gwynbliedd.com/
+                description: gwent from witcher3
+                icon: /icons/gwent.png
       widgets:
         - resources:
             # change backend to 'kubernetes' to use Kubernetes integration. Requires RBAC.
