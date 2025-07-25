@@ -8,4 +8,5 @@ resources:
   - gwent-game.yaml
   - cnpg.yaml
   - pgadmin.yaml
+  - vscode.yaml
   #- wallabag.yaml
