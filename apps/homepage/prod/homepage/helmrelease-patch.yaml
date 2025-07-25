@@ -61,6 +61,10 @@ spec:
                 href: https://grafana.gwynbliedd.com/
                 description: monitor infrastructure
                 icon: grafana
+            - PGAdmin:
+                href: https://pgadmin.gwynbliedd.com/
+                description: DB control panel
+                icon: postgresql
 
         - DevOps Tools:
             - Jenkins:
