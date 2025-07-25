@@ -7,4 +7,5 @@ resources:
   - jenkins.yaml
   - gwent-game.yaml
   - cnpg.yaml
+  - pgadmin.yaml
   #- wallabag.yaml
