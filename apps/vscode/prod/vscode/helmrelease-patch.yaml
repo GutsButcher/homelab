@@ -1,0 +1,45 @@
+apiVersion: helm.toolkit.fluxcd.io/v2beta1
+kind: HelmRelease
+metadata:
+  name: vscode
+  namespace: vscode
+spec:
+  values:
+    # Secret configuration for passwords
+    secret:
+      PASSWORD: "abc"
+      SUDO_PASSWORD: "root"
+
+    # See more environment variables in the code-server documentation
+    # https://github.com/linuxserver/docker-code-server#parameters
+    env:
+      TZ: "Asia/Bahrain"
+      PUID: 1000
+      PGID: 1000
+
+    service:
+      port:
+        port: 8443
+
+    persistence:
+      # Configuration persistence (VS Code settings, extensions, etc.)
+      config:
+        enabled: true
+        type: pvc
+        accessMode: ReadWriteOnce
+        size: 100Mi
+        mountPath: /config
+        
+      # Main workspace/project directory persistence
+      workspace:
+        enabled: true
+        type: pvc
+        accessMode: ReadWriteOnce
+        size: 300Mi
+        mountPath: /workspace
+    # Security context
+    securityContext:
+      runAsUser: 1000
+      runAsGroup: 1000
+      fsGroup: 1000
+
