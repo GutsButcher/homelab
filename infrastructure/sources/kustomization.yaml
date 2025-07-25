@@ -6,4 +6,5 @@ resources:
   - metallb.yaml
   - jenkins.yaml
   - gwent-game.yaml
-  - wallabag.yaml
+  - cnpg.yaml
+  #- wallabag.yaml
