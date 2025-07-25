@@ -5,6 +5,8 @@ metadata:
   namespace: pgadmin
 spec:
   values:
+    env:
+      email: abdulla.amash@gmail.com
     existingSecret: "pgadmin-credentials"
     secretKeys:
       pgadminPasswordKey: password
