@@ -5,4 +5,26 @@ metadata:
   namespace: pgadmin
 spec:
   values:
-    replicaCount: 1
+    existingSecret: "pgadmin-credentials"
+    secretKeys:
+      pgadminPasswordKey: password
+    
+    persistentVolume:
+      ## If true, pgAdmin4 will create/use a Persistent Volume Claim
+      ## If false, use emptyDir
+      ##
+      enabled: true
+
+      ## pgAdmin4 Persistent Volume Claim annotations
+      ##
+      annotations: {}
+
+      ## pgAdmin4 Persistent Volume access modes
+      ## Must match those of existing PV or dynamic provisioner
+      ## Ref: http://kubernetes.io/docs/user-guide/persistent-volumes/
+      accessModes:
+        - ReadWriteOnce
+
+      ## pgAdmin4 Persistent Volume Size
+      ##
+      size: 5Gi
