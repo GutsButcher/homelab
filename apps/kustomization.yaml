@@ -6,3 +6,4 @@ resources:
   - traefik
   - jenkins
   - gwent-game
+  - pgadmin
