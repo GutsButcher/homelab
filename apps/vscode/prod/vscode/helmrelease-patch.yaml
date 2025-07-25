@@ -43,3 +43,7 @@ spec:
       runAsGroup: 1000
       fsGroup: 1000
 
+
+    # Disable automatic envFrom if the chart supports it
+    # (This might not be available in all chart versions)
+    envFrom: []
