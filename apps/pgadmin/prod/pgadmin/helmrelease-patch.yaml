@@ -27,4 +27,4 @@ spec:
 
       ## pgAdmin4 Persistent Volume Size
       ##
-      size: 5Gi
+      size: 10Gi
