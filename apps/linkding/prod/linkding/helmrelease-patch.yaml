@@ -5,6 +5,7 @@ metadata:
   namespace: linkding
 spec:
   values:
+    common:
       # env variables
       variables:
         secret: {}
@@ -21,5 +22,4 @@ spec:
         volumes:
           - name: "data"
             size: "5Gi"
-            pvcClaim: ""  # Fill only if you want to use existing pvc
             containerMount: "/etc/linkding/data"
