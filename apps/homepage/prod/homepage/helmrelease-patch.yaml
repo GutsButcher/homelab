@@ -77,8 +77,14 @@ spec:
                 icon: ansible
 
         - Other:
+            - YouTube:
+                href: https://www.youtube.com
+                icon: youtube
+            - X:
+                href: https://www.x.com
+                icon: X
             - CommaFeed:
-                href: https://feed.gwynbliedd.com/
+                href: https://www.commafeed.com/#/app/category/all
                 description: CommaFeed RSS reader
                 icon: commafeed
             - Gwent:

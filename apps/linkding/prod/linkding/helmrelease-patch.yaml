@@ -1,0 +1,21 @@
+apiVersion: helm.toolkit.fluxcd.io/v2beta1
+kind: HelmRelease
+metadata:
+  name: linkding
+  namespace: linkding
+spec:
+  values:
+      # env variables
+      variables:
+        secret: {}
+        nonSecret:
+          USER_UID: '1000'
+          USER_GID: '1000'
+          TZ: Asia/Bahrain
+      persistence:
+        enabled: true
+        volumes:
+          - name: "data"
+            size: "5Gi"
+            pvcClaim: ""  # Fill only if you want to use existing pvc
+            containerMount: "/etc/linkding/data"
