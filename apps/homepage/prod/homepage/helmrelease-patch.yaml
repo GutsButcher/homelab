@@ -77,12 +77,15 @@ spec:
                 icon: ansible
 
         - Other:
+            - Linkding:
+                href: https://linkding.gwynbliedd.com/
+                icon: linkding
             - YouTube:
                 href: https://www.youtube.com
                 icon: youtube
             - X:
                 href: https://www.x.com
-                icon: X
+                icon: /icons/x.webp
             - CommaFeed:
                 href: https://www.commafeed.com/#/app/category/all
                 description: CommaFeed RSS reader
