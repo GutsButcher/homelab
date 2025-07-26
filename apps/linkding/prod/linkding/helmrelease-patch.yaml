@@ -13,8 +13,9 @@ spec:
           USER_GID: '1000'
           TZ: Asia/Bahrain
           LD_ALLOWED_HOSTS: "linkding.gwynbliedd.com,localhost,127.0.0.1"
-          LD_CSRF_TRUSTED_ORIGINS: "https://linkding.gwynbliedd.com,https://linkding.gwynbliedd.com"
+          LD_CSRF_TRUSTED_ORIGINS: "https://linkding.gwynbliedd.com"
           LD_REQUEST_TIMEOUT: "60"
+          LD_TESTO: "TEST"
       persistence:
         enabled: true
         volumes:
