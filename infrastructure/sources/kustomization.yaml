@@ -9,4 +9,5 @@ resources:
   - cnpg.yaml
   - pgadmin.yaml
   - vscode.yaml
+  - linkding.yaml
   #- wallabag.yaml
