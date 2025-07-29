@@ -75,6 +75,10 @@ spec:
                 href: https://awx.gwynbliedd.com/
                 description: Ansible AWX server
                 icon: ansible
+            - Wallabag:
+                href: https://wallabag.gwynbliedd.com/
+                description: Read it later service
+                icon: wallabag
 
         - Other:
             - Linkding:
