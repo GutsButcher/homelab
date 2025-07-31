@@ -1,0 +1,50 @@
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: sealed-secrets
+  namespace: sealed-secrets
+spec:
+  interval: 15m
+  chart:
+    spec:
+      chart: sealed-secrets
+      version: "2.16.2"
+      sourceRef:
+        kind: HelmRepository
+        name: sealed-secrets
+        namespace: flux-system
+      interval: 15m
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      retries: 3
+      strategy: rollback
+  uninstall:
+    keepHistory: false
+  values:
+    fullnameOverride: sealed-secrets-controller
+    controller:
+      create: true
+      resources:
+        requests:
+          cpu: 50m
+          memory: 64Mi
+        limits:
+          memory: 256Mi
+    serviceAccount:
+      create: true
+      name: sealed-secrets-controller
+    rbac:
+      create: true
+      pspEnabled: false
+    secretName: sealed-secrets-key
+    updateStatus: true
+    metrics:
+      serviceMonitor:
+        enabled: false
+    networkPolicy:
+      enabled: false

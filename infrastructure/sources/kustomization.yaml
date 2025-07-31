@@ -11,3 +11,4 @@ resources:
   - vscode.yaml
   - linkding.yaml
   #- wallabag.yaml
+  - sealed-secrets-source.yaml
