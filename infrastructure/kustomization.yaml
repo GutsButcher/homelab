@@ -4,4 +4,5 @@ resources:
   - sources
   - metallb
   - cnpg
+  - sealed-secrets
 
