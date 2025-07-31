@@ -11,5 +11,5 @@ spec:
       kind: Rule
       services:
         - name: jenkins
-          namespace: devops
+          namespace: jenkins
           port: 8080
