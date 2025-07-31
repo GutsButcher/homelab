@@ -1,0 +1,25 @@
+---
+# CloudNativePG Cluster
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: postgres-cluster
+  namespace: wallabag
+spec:
+  instances: 1  # Can be increased for HA
+  
+  postgresql:
+    parameters:
+      max_connections: "200"
+      shared_buffers: "256MB"
+      effective_cache_size: "1GB"
+      
+  bootstrap:
+    initdb:
+      database: wallabag
+      owner: wallabag
+      secret:
+        name: postgres-app-user
+        
+  storage:
+    size: 10Gi
