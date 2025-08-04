@@ -36,26 +36,32 @@ spec:
             - Cloudflare:
                 - abbr: CL
                   href: https://one.dash.cloudflare.com/c068606ad3dfd1fe3cf547d47b50e760/networks/tunnels/cfd_tunnel/9e35fd1d-eede-4d73-8348-1b92a75a5fb2/edit?tab=overview
-                  icon: n8n
+                  icon: cloudflare
             - Github:
                 - abbr: GH
                   href: https://github.com/GutsButcher?tab=repositories
+                  icon: github
             - GitLab:
                 - abbr: GL
                   href: https://gitlab.com/gwynbliedd1
+                  icon: gitlab
         - Documents:
           - Kubernetes Docs:
               - abbr: K8
                 href: https://kubernetes.io/docs/home/
+                icon: kubernetes
           - Bash Cheatsheet:
               - abbr: SH
                 href: https://learnxinyminutes.com/bash/
+                icon: bash
           - Go Docs:
               - abbr: GO
                 href: https://go.dev/doc/
+                icon: go
           - Homepage:
               - abbr: HP
                 href: https://gethomepage.dev/configs/           
+                icon: homepage
 
       services:
         - Infrastructure:
