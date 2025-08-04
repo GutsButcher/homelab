@@ -109,7 +109,7 @@ spec:
             - Gwent:
                 href: https://gwent.gwynbliedd.com/
                 description: gwent from witcher3
-                icon: /icons/gwent.png
+                icon: /icons/witcher.jpg
       widgets:
         - resources:
             # change backend to 'kubernetes' to use Kubernetes integration. Requires RBAC.
