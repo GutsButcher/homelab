@@ -31,19 +31,7 @@ spec:
       # To use an existing ConfigMap uncomment this line and specify the name
       # useExistingConfigMap: existing-homepage-configmap
       bookmarks:
-        - Developer:
-            - Homepage:
-                - abbr: HP
-                  href: https://gethomepage.dev/configs/
-            - Dashboard Icons:
-                - abbr: Icons
-                  href: https://gethomepage.dev/configs/
-            - Github:
-                - abbr: GH
-                  href: https://github.com/GutsButcher?tab=repositories
-            - GitLab:
-                - abbr: GL
-                  href: https://gitlab.com/gwynbliedd1
+        - Documents:
             - Kubernetes Docs:
                 - abbr: K8
                   href: https://kubernetes.io/docs/home/
@@ -53,6 +41,19 @@ spec:
             - Go Docs:
                 - abbr: GO
                   href: https://go.dev/doc/
+            - Homepage:
+                - abbr: HP
+                  href: https://gethomepage.dev/configs/
+        - Frequently Visited:
+            - Cloudflare:
+                - abbr: CL
+                  href: https://one.dash.cloudflare.com/c068606ad3dfd1fe3cf547d47b50e760/networks/tunnels/cfd_tunnel/9e35fd1d-eede-4d73-8348-1b92a75a5fb2/edit?tab=overview
+            - Github:
+                - abbr: GH
+                  href: https://github.com/GutsButcher?tab=repositories
+            - GitLab:
+                - abbr: GL
+                  href: https://gitlab.com/gwynbliedd1
             
 
       services:
@@ -69,12 +70,16 @@ spec:
         - DevOps Tools:
             - Jenkins:
                 href: https://jenkins.gwynbliedd.com/
-                description: jenkins server
+                description: jenkins self hosted server
                 icon: jenkins
             - Ansible:
                 href: https://awx.gwynbliedd.com/
                 description: Ansible AWX server
                 icon: ansible
+            - n8n:
+                href: https://n8n.gwynbliedd.com/
+                description: n8n self hosted automation
+                icon: n8n
             - Wallabag:
                 href: https://wallabag.gwynbliedd.com/
                 description: Read it later service
