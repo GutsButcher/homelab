@@ -40,7 +40,7 @@ spec:
             - Github:
                 - abbr: GH
                   href: https://github.com/GutsButcher?tab=repositories
-                  icon: github
+                  icon: github-light
             - GitLab:
                 - abbr: GL
                   href: https://gitlab.com/gwynbliedd1
