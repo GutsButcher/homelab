@@ -10,5 +10,6 @@ resources:
   - pgadmin.yaml
   - vscode.yaml
   - linkding.yaml
+  - cert-manager.yaml
   #- wallabag.yaml
   - sealed-secrets-source.yaml
