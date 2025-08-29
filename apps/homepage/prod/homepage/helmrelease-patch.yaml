@@ -77,7 +77,7 @@ spec:
         - DevOps Tools:
             - Jenkins:
                 href: https://jenkins.gwynbliedd.com/
-                description: jenkins self hosted server
+                description: jenkins self hosted service
                 icon: jenkins
             - Ansible:
                 href: https://awx.gwynbliedd.com/
@@ -85,7 +85,7 @@ spec:
                 icon: ansible
             - n8n:
                 href: https://n8n.gwynbliedd.com/
-                description: n8n self hosted automation
+                description: n8n self hosted automation service
                 icon: n8n
             - Wallabag:
                 href: https://wallabag.gwynbliedd.com/
