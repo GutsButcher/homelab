@@ -5,4 +5,5 @@ resources:
   - metallb
   - cnpg
   - sealed-secrets
+  - cert-manager
 
