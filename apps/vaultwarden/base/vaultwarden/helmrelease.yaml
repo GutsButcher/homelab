@@ -1,0 +1,15 @@
+apiVersion: helm.toolkit.fluxcd.io/v2beta1
+kind: HelmRelease
+metadata:
+  name: vaultwardenk
+  namespace: vaultwarden
+spec:
+  interval: 30m
+  chart:
+    spec:
+      chart: vaultwarden
+      version: ">=0.2.3 <1.0.0"
+      sourceRef:
+        kind: HelmRepository
+        name: fmjstudios # the Chart is fmjstudios/vaultwarden
+        namespace: flux-system
