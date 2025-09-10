@@ -1,0 +1,8 @@
+apiVersion: source.toolkit.fluxcd.io/v1beta2
+kind: HelmRepository # resource that defines a Helm repository source
+metadata:
+  name: fmjstudios
+  namespace: flux-system
+spec:
+  interval: 24h
+  url: https://fmjstudios.github.io/helm # URL of the Helm repository source

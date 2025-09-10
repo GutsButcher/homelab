@@ -13,3 +13,4 @@ resources:
   - cert-manager.yaml
   #- wallabag.yaml
   - sealed-secrets-source.yaml
+  - vaultwarden.yaml
