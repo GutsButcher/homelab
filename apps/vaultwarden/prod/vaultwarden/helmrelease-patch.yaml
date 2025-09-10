@@ -5,6 +5,7 @@ metadata:
   namespace: vaultwarden
 spec:
   values:
-    data:
-      pvc:
-        storageClass: local-path
+    vaultwarden:
+      data:
+        pvc:
+          storageClass: local-path
