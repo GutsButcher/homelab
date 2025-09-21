@@ -11,3 +11,4 @@ resources:
   - wallabag
   - n8n
   - vaultwarden
+  - syncthing
