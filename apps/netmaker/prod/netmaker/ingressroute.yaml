@@ -22,7 +22,7 @@ spec:
   entryPoints:
     - web
   routes:
-    - match: Host(`netmaker-dashboard.gwynbliedd.com`)
+    - match: Host(`netmaker.gwynbliedd.com`)
       kind: Rule
       services:
         - name: netmaker-ui
