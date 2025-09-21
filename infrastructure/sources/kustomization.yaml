@@ -14,5 +14,3 @@ resources:
   #- wallabag.yaml
   - sealed-secrets-source.yaml
   - vaultwarden.yaml
-  - netmaker.yaml
-  - ingress-nginx.yaml
