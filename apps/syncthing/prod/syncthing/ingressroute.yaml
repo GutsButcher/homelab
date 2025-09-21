@@ -1,0 +1,15 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: syncthing
+  namespace: syncthing
+  annotations:
+spec:
+  entryPoints:
+    - web
+  routes:
+    - match: Host(`syncthing.gwynbliedd.com`)
+      kind: Rule
+      services:
+        - name: syncthing
+          port: 8384
