@@ -7,6 +7,9 @@ spec:
   values:
     baseDomain: "netmaker.gwynbliedd.com"
     
+    api:
+      publicHost: "netmaker-api.gwynbliedd.com"
+    
     server:
       replicas: 1
       masterKey: "test-master-key-change-in-production"
@@ -16,17 +19,17 @@ spec:
       
     ui:
       replicas: 1
+      backendURL: "https://netmaker-api.gwynbliedd.com"
       
     mq:
       replicas: 1
       username: netmaker
       password: "test-mqtt-password"
+      allowAnonymous: true
+      publicHost: "netmaker-broker.gwynbliedd.com"
     
     db:
       password: "test-netmaker-db-password"
-      
-    mq:
-      allowAnonymous: true
       
     ingress:
       enabled: false

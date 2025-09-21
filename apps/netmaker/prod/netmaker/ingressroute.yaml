@@ -7,7 +7,7 @@ spec:
   entryPoints:
     - web
   routes:
-    - match: Host(`api.netmaker.gwynbliedd.com`)
+    - match: Host(`netmaker-api.gwynbliedd.com`)
       kind: Rule
       services:
         - name: netmaker-rest
@@ -37,7 +37,7 @@ spec:
   entryPoints:
     - web
   routes:
-    - match: Host(`broker.netmaker.gwynbliedd.com`)
+    - match: Host(`netmaker-broker.gwynbliedd.com`)
       kind: Rule
       services:
         - name: netmaker-mqtt
