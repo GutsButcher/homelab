@@ -5,10 +5,13 @@ metadata:
   namespace: netmaker
 spec:
   values:
-    baseDomain: "netmaker.gwynbliedd.com"
+    baseDomain: "gwynbliedd.com"
     
-    api:
-      publicHost: "netmaker-api.gwynbliedd.com"
+    ingress:
+      hostPrefix:
+        ui: "netmaker"
+        rest: "netmaker-api"
+        broker: "netmaker-broker"
     
     server:
       replicas: 1
@@ -19,14 +22,12 @@ spec:
       
     ui:
       replicas: 1
-      backendURL: "https://netmaker-api.gwynbliedd.com"
       
     mq:
       replicas: 1
       username: netmaker
       password: "test-mqtt-password"
       allowAnonymous: true
-      publicHost: "netmaker-broker.gwynbliedd.com"
     
     db:
       password: "test-netmaker-db-password"
