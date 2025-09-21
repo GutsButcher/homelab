@@ -1,0 +1,32 @@
+apiVersion: helm.toolkit.fluxcd.io/v2beta1
+kind: HelmRelease
+metadata:
+  name: netmaker
+  namespace: netmaker
+spec:
+  values:
+    baseDomain: "netmaker.gwynbliedd.com"
+    
+    server:
+      replicas: 1
+      masterKey: "test-master-key-change-in-production"
+      storageSize: 512Mi
+      RWX:
+        storageClassName: "local-path"
+      
+    ui:
+      replicas: 1
+      
+    mq:
+      replicas: 1
+      username: netmaker
+      password: "test-mqtt-password"
+    
+    db:
+      password: "test-netmaker-db-password"
+      
+    mq:
+      allowAnonymous: true
+      
+    ingress:
+      enabled: false

@@ -1,0 +1,37 @@
+---
+# Secret for CNPG database credentials
+apiVersion: v1
+kind: Secret
+metadata:
+  name: netmaker-postgres-credentials
+  namespace: netmaker
+type: Opaque
+stringData:
+  database: netmaker
+  username: netmaker
+  password: test-netmaker-db-password
+---
+# CloudNativePG Cluster
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: netmaker-postgres
+  namespace: netmaker
+spec:
+  instances: 1
+  
+  postgresql:
+    parameters:
+      max_connections: "200"
+      shared_buffers: "256MB"
+      
+  bootstrap:
+    initdb:
+      database: netmaker
+      owner: netmaker
+      secret:
+        name: netmaker-postgres-credentials
+        
+  storage:
+    size: 5Gi
+    storageClass: local-path

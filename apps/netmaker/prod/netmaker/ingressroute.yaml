@@ -1,0 +1,44 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: netmaker-api
+  namespace: netmaker
+spec:
+  entryPoints:
+    - web
+  routes:
+    - match: Host(`netmaker-api.gwynbliedd.com`)
+      kind: Rule
+      services:
+        - name: netmaker-rest
+          port: 8081
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: netmaker-ui
+  namespace: netmaker
+spec:
+  entryPoints:
+    - web
+  routes:
+    - match: Host(`netmaker-dashboard.gwynbliedd.com`)
+      kind: Rule
+      services:
+        - name: netmaker-ui
+          port: 80
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: netmaker-broker
+  namespace: netmaker
+spec:
+  entryPoints:
+    - web
+  routes:
+    - match: Host(`netmaker-broker.gwynbliedd.com`)
+      kind: Rule
+      services:
+        - name: netmaker-mqtt
+          port: 443

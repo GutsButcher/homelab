@@ -12,3 +12,4 @@ resources:
   - n8n
   - vaultwarden
   - syncthing
+  - netmaker
