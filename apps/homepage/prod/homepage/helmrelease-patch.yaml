@@ -73,6 +73,10 @@ spec:
                 href: https://pgadmin.gwynbliedd.com/
                 description: DB control panel
                 icon: postgresql
+            - Syncthing:
+                href: https://syncthing.gwynbliedd.com/
+                description: Syncronized shared storage
+                icon: syncthing
 
         - DevOps Tools:
             - Jenkins:
