@@ -77,6 +77,10 @@ spec:
                 href: https://syncthing.gwynbliedd.com/
                 description: Syncronized shared storage
                 icon: syncthing
+            - Pi-Hole:
+                href: https://pi-hole.gwynbliedd.com/
+                description: Homelab DNS
+                icon: pi-hole
 
         - DevOps Tools:
             - Jenkins:
@@ -95,6 +99,10 @@ spec:
                 href: https://wallabag.gwynbliedd.com/
                 description: Read it later service
                 icon: wallabag
+            - VaultWarden:
+                href: https://vaultwarden.gwynbliedd.com/
+                description: Passwords and Secrets Manager
+                icon: vaultwarden
 
         - Other:
             - Linkding:
