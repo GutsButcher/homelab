@@ -81,6 +81,10 @@ spec:
                 href: https://pi-hole.gwynbliedd.com/
                 description: Homelab DNS
                 icon: pi-hole
+            - Nextcloud:
+                href: https://nextcloud.gwynbliedd.com/
+                description: Cloud storage and services
+                icon: nextcloud
 
         - DevOps Tools:
             - Jenkins:
