@@ -1,0 +1,26 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: pihole
+  namespace: pihole
+spec:
+  entryPoints:
+    - web
+  routes:
+    - match: Host(`pihole.gwynbliedd.com`)
+      kind: Rule
+      services:
+        - name: pihole-web
+          port: 80
+      middlewares:
+        - name: pihole-admin
+          namespace: pihole
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: pihole-admin
+  namespace: pihole
+spec:
+  addPrefix:
+    prefix: /admin

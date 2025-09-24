@@ -1,0 +1,38 @@
+# Default values for Pi-hole deployment
+replicaCount: 1
+
+serviceDns:
+  type: LoadBalancer
+  loadBalancerIP: "192.168.100.220"
+  annotations:
+    metallb.universe.tf/address-pool: default-pool
+
+serviceDhcp:
+  enabled: false
+
+serviceWeb:
+  http:
+    enabled: true
+    port: 80
+  https:
+    enabled: false
+  type: ClusterIP
+
+persistentVolumeClaim:
+  enabled: true
+  size: "2Gi"
+  storageClass: "local-path"
+
+admin:
+  enabled: true
+  existingSecret: "pihole-admin"
+
+extraEnvVars:
+  TZ: "UTC"
+  FTLCONF_dns_listeningMode: 'all'
+
+DNS1: "1.1.1.1"
+DNS2: "1.0.0.1"
+
+ingress:
+  enabled: false
