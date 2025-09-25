@@ -3,6 +3,7 @@ kind: Kustomization
 resources:
   - cnpg-secret.yaml
   - cnpg.yaml
-  - admin-secret.yaml
   - db-connection-secret.yaml
+  - smtp-secret.yaml
+  - admin-secret.yaml
   - helmrelease.yaml
