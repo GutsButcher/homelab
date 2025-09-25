@@ -5,6 +5,8 @@ metadata:
   namespace: vaultwarden
 spec:
   values:
+    image:
+      tag: "1.34.3-alpine"
     service:
         extraPorts:
           - name: websocket
