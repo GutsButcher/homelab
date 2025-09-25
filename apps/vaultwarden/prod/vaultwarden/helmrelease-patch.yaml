@@ -5,6 +5,11 @@ metadata:
   namespace: vaultwarden
 spec:
   values:
+    service:
+        extraPorts:
+          - name: websocket
+            port: 3012
+            targetPort: 3012
     vaultwarden:
       domain: "vaultwarden.gwynbliedd.com"
       adminToken:
@@ -14,6 +19,8 @@ spec:
       data:
         pvc:
           storageClass: local-path
+      
+
       passwords:
         hintsAllowed: true
         showHint: true

@@ -7,6 +7,13 @@ spec:
   entryPoints:
     - web
   routes:
+    # Websocket route - must be first (more specific)
+    - match: Host(`vaultwarden.gwynbliedd.com`) && PathPrefix(`/notifications/hub`)
+      kind: Rule
+      services:
+        - name: vaultwarden
+          port: 3012
+    # Main application route - catches everything else
     - match: Host(`vaultwarden.gwynbliedd.com`)
       kind: Rule
       services:
