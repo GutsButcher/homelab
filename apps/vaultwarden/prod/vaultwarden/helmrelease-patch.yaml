@@ -21,4 +21,25 @@ spec:
         type: postgresql
         existingSecret:
           name: db-secret
-          key: uri 
+          key: uri
+      # Task 1: Restrict signups - only admin can invite
+      signup:
+        allowed: false      # Disable public registration
+        verify: true        # Email verification for invites
+      invitations:
+        allowed: true       # Admin can invite users
+        orgName: "Gwynbliedd Vault"
+        expirationHours: 48
+      # Task 2: Gmail SMTP Configuration
+      email:
+        smtp:
+          host: "smtp.gmail.com"
+          from: "abdulla.amash@gmail.com"
+          fromName: "Gwynbliedd Vault"
+          security: "force_tls"
+          port: 465
+          username: "abdulla.amash@gmail.com"
+          auth: "Login"
+          existingSecret:
+            name: "vaultwarden-smtp"
+          requireDeviceEmail: true  # Email on new device login 
