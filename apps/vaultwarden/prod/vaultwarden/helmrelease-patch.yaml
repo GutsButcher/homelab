@@ -18,9 +18,7 @@ spec:
         hintsAllowed: true
         showHint: true
       database:
-        type: postgres
-        # provide uri directly from  a secret
-        uri:
-          existingSecret:
-            name: db-secret
-            key: uri 
+        type: postgresql
+        existingSecret:
+          name: db-secret
+          key: uri 
