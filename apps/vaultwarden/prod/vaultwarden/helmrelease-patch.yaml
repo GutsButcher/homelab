@@ -22,6 +22,7 @@ spec:
       
 
       passwords:
+        iterations: 350000  # KDF iterations - required for mobile app
         hintsAllowed: true
         showHint: true
       database:
