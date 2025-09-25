@@ -22,7 +22,7 @@ spec:
         existingSecret:
           name: db-secret
           key: uri
-      # Task 1: Restrict signups - only admin can invite
+      # Restrict signups - only admin can invite
       signup:
         allowed: false      # Disable public registration
         verify: true        # Email verification for invites
@@ -30,7 +30,7 @@ spec:
         allowed: true       # Admin can invite users
         orgName: "Gwynbliedd Vault"
         expirationHours: 48
-      # Task 2: Gmail SMTP Configuration
+      # Gmail SMTP Configuration
       email:
         smtp:
           host: "smtp.gmail.com"
