@@ -7,6 +7,20 @@ spec:
   values:
     vaultwarden:
       domain: "vaultwarden.gwynbliedd.com"
+      adminToken:
+        existingSecret:
+          name: admin-token
+          key: token
       data:
         pvc:
           storageClass: local-path
+      passwords:
+        hintsAllowed: true
+        showHint: true
+      database:
+        type: postgres
+        # provide uri directly from  a secret
+        uri:
+          existingSecret:
+            name: db-secret
+            key: uri 
