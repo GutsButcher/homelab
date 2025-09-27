@@ -15,5 +15,4 @@ resources:
   - sealed-secrets-source.yaml
   - vaultwarden.yaml
   - pihole.yaml
-  - authelia.yaml
   - goauthentik.yaml
