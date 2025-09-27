@@ -4,9 +4,3 @@ resources:
   - ../../base/authelia
   - ingressroute.yaml
   - forwardauth-middleware.yaml
-  - users-configmap.yaml
-patches:
-  - path: helmrelease-patch.yaml
-    target:
-      kind: HelmRelease
-      name: authelia

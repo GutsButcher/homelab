@@ -1,0 +1,82 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: authelia-config
+  namespace: authelia
+data:
+  configuration.yaml: |
+    theme: light
+    default_2fa_method: ""
+    server:
+      address: tcp://0.0.0.0:9091
+      endpoints:
+        authz:
+          forward-auth:
+            implementation: ForwardAuth
+            authn_strategies:
+              - name: HeaderProxyAuthorization
+                schemes:
+                  - Basic
+              - name: CookieSession
+    
+    log:
+      level: info
+    
+    totp:
+      disable: true
+    
+    authentication_backend:
+      file:
+        path: /config/users.yml
+        password:
+          algorithm: argon2id
+          iterations: 3
+          memory: 65536
+          parallelism: 4
+          key_length: 32
+          salt_length: 16
+    
+    session:
+      expiration: 1M
+      inactivity: 2w 
+      remember_me: 1M
+      cookies:
+        - domain: gwynbliedd.com
+          authelia_url: https://auth.gwynbliedd.com
+          default_redirection_url: https://homepage.gwynbliedd.com
+    
+    storage:
+      local:
+        path: /config/db.sqlite3
+    
+    notifier:
+      filesystem:
+        filename: /config/notification.txt
+    
+    access_control:
+      default_policy: one_factor
+      rules:
+        - domain: auth.gwynbliedd.com
+          policy: bypass
+        
+        - domain:
+            - homepage.gwynbliedd.com
+            - home.gwynbliedd.com
+            - gwynbliedd.com
+          policy: one_factor
+    
+    regulation:
+      max_retries: 3
+      find_time: 2m
+      ban_time: 5m
+  
+  users.yml: |
+    users:
+      gwynbliedd:
+        disabled: false
+        displayname: "Gwynbliedd"
+        password: "$argon2id$v=19$m=65536,t=3,p=4$11e31S933TtBZy+UIFFOOw$I3nQYZfAJcBrSPxnFTmlaYoCGYw2ccyIXFiHeXfnqG0"
+        email: gwynbliedd@gwynbliedd.com
+        groups:
+          - admins
+          - users
