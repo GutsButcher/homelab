@@ -1,0 +1,25 @@
+apiVersion: helm.toolkit.fluxcd.io/v2beta1
+kind: HelmRelease
+metadata:
+  name: authentik
+  namespace: authentik
+spec:
+  values:
+    authentik:
+      secret_key: "cfa3Gk1NPfTe5WmQhpkk04Kvw6XDvwIqjI58icxMvQ2MVQ6BxS"
+      email:
+        host: "smtp.gmail.com"
+        port: 587
+        username: "abdulla.amash@gmail.com"
+        password: "gita yyrq iuax dtxd"
+        from: "abdulla.amash@gmail.com"
+      postgresql:
+        password: "postgresql_password"
+      redis:
+        password: "redis_password"
+    postgresql:
+      enabled: true
+      auth:
+       password: "postgresql_password"
+    redis:
+      enabled: true

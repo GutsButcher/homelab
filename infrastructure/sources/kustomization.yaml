@@ -16,3 +16,4 @@ resources:
   - vaultwarden.yaml
   - pihole.yaml
   - authelia.yaml
+  - goauthentik.yaml
