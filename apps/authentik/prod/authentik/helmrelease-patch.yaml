@@ -6,6 +6,12 @@ metadata:
 spec:
   values:
     server:
+      ingress:
+        enabled: true
+        ingressClassName: traefik
+        hosts:
+          - auth.gwynbliedd.com
+        tls: []
       env:
         - name: AUTHENTIK_LISTEN__TRUSTED_PROXY_CIDRS
           value: "10.42.0.0/16,10.43.0.0/16,192.168.100.0/24"
