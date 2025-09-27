@@ -10,5 +10,5 @@ spec:
     - match: Host(`auth.gwynbliedd.com`)
       kind: Rule
       services:
-        - name: authentik
+        - name: authentik-server
           port: 80
