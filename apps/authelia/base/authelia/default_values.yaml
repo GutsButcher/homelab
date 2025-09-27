@@ -1,0 +1,78 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: authelia-values
+  namespace: authelia
+data:
+  values.yaml: |
+    domain: gwynbliedd.com
+    
+    ingress:
+      enabled: false  # We'll use Traefik IngressRoute instead
+    
+    pod:
+      replicas: 1
+      
+    configMap:
+      enabled: true
+      theme: light
+      
+      authentication_backend:
+        file:
+          enabled: true
+          path: /config/users_database.yml
+          password:
+            algorithm: argon2id
+            iterations: 3
+            memory: 65536
+            parallelism: 4
+            key_length: 32
+            salt_length: 16
+      
+      session:
+        expiration: 1M  # 1 month
+        inactivity: 2w  # 2 weeks
+        remember_me: 1M  # 1 month
+        cookies:
+          - domain: gwynbliedd.com
+            subdomain: true
+            authelia_url: https://auth.gwynbliedd.com
+      
+      storage:
+        local:
+          enabled: true
+          path: /config/db.sqlite3
+      
+      notifier:
+        filesystem:
+          enabled: true
+          filename: /config/notification.txt
+      
+      access_control:
+        default_policy: one_factor
+        rules:
+          # Authelia itself is always accessible
+          - domain: auth.gwynbliedd.com
+            policy: bypass
+          
+          # Homepage requires authentication
+          - domain: 
+              - homepage.gwynbliedd.com
+              - home.gwynbliedd.com
+              - gwynbliedd.com
+            policy: one_factor
+          
+          # Add more services here as needed
+          
+      regulation:
+        max_retries: 3
+        find_time: 2m
+        ban_time: 5m
+    
+    persistence:
+      enabled: true
+      size: 1Gi
+      accessMode: ReadWriteOnce
+      
+    secret:
+      existingSecret: authelia-secrets

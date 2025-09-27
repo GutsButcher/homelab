@@ -1,0 +1,12 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: authelia
+  namespace: authelia
+spec:
+  values:
+    configMap:
+      existingConfigMap: authelia-users
+      
+    persistence:
+      storageClass: local-path  # Adjust if you use different storage class
