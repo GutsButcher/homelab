@@ -15,12 +15,9 @@ spec:
         from: "abdulla.amash@gmail.com"
       postgresql:
         password: "postgresql_password"
-      redis:
-        password: "redis_password"
     postgresql:
       enabled: true
       auth:
        password: "postgresql_password"
     redis:
       enabled: true
-      password: "redis_password"
