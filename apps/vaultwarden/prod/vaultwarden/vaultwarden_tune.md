@@ -1,149 +1,42 @@
-# Vaultwarden Configuration Enhancements
+# Vaultwarden Configuration - Completed & Future Plans
 
-This document contains the configuration tasks and procedures for securing and optimizing Vaultwarden.
+## Current Status (Completed September 2025)
 
-## Task 1: Configure Signup Restrictions
+### ✅ Implemented Features
 
-### Goal
-Prevent open registration - only allow specific users or invited users to create accounts.
+1. **Signup Restrictions** - Admin-only invitations enabled
+2. **Gmail SMTP** - Email notifications configured and working
+3. **Websocket Support** - Real-time sync active on port 3012
+4. **Mobile Compatibility** - Updated to v1.34.3, mobile app working
+5. **Security** - Restricted access, email verification enabled
 
-### Configuration Options
+### 📊 Current Configuration
 
-#### Option A: Completely Disable Signups (Most Secure)
 ```yaml
+# Active configuration in helmrelease-patch.yaml
 vaultwarden:
+  domain: "vaultwarden.gwynbliedd.com"
+  image:
+    tag: "1.34.3-alpine"
   signup:
-    allowed: false        # No one can sign up
-    verify: true         # Email verification still required for invites
-```
-
-#### Option B: Domain Whitelist (Recommended)
-```yaml
-vaultwarden:
-  signup:
-    allowed: true
+    allowed: false
     verify: true
-    domainWhitelist: "gwynbliedd.com,gmail.com"  # Only these email domains can register
-```
-
-#### Option C: Admin-Only Invitations
-```yaml
-vaultwarden:
-  signup:
-    allowed: false       # Disable public signups
   invitations:
-    allowed: true        # Allow admin to invite users
+    allowed: true
     orgName: "Gwynbliedd Vault"
-    expirationHours: 48  # Invitation expires in 48 hours
-```
-
-### Implementation Steps
-
-1. Edit `/apps/vaultwarden/prod/vaultwarden/helmrelease-patch.yaml`
-2. Add under `vaultwarden:` section:
-```yaml
-signup:
-  allowed: false
-  verify: true
-invitations:
-  allowed: true
-  orgName: "Gwynbliedd Vault"
-```
-
-## Task 2: Configure Gmail SMTP
-
-### Prerequisites
-1. Gmail account: abdulla.amash@gmail.com
-2. App-specific password (required for Gmail with 2FA)
-   - Go to: https://myaccount.google.com/apppasswords
-   - Create app password for "Mail"
-   - Save the 16-character password
-
-### Configuration
-
-#### Create SMTP Secret
-```bash
-# Create the secret with Gmail SMTP password
-kubectl create secret generic vaultwarden-smtp \
-  --from-literal=smtp-password='YOUR_APP_PASSWORD_HERE' \
-  --from-literal=smtp-user='abdulla.amash@gmail.com' \
-  -n vaultwarden --dry-run=client -o yaml > smtp-secret.yaml
-
-# Seal the secret
-kubeseal --format=yaml < smtp-secret.yaml > smtp-sealed-secret.yaml
-
-# Apply
-kubectl apply -f smtp-sealed-secret.yaml
-```
-
-#### Update Helm Values
-Add to `/apps/vaultwarden/prod/vaultwarden/helmrelease-patch.yaml`:
-
-```yaml
-vaultwarden:
   email:
-    smtp:
-      host: "smtp.gmail.com"
-      from: "abdulla.amash@gmail.com"
-      fromName: "Gwynbliedd Vault"
-      security: "force_tls"    # Gmail requires TLS
-      port: 465                # SSL/TLS port
-      username: "abdulla.amash@gmail.com"
-      auth: "Login"            # Gmail uses Login auth
-      acceptInvalidCertificates: false
-      acceptInvalidHostnames: false
-      requireDeviceEmail: true # Email on new device login
-      existingSecret:
-        name: "vaultwarden-smtp"
-        # Note: The secret should contain 'username' and 'password' keys
+    smtp: [configured with Gmail]
+  database:
+    type: postgresql
+    existingSecret: db-secret
+  websocket:
+    enabled: true
+    port: 3012
 ```
 
-## Task 3: Websocket Configuration
+## Future Enhancement Plans
 
-### What is Websocket in Vaultwarden?
-- Enables real-time sync between devices
-- Port: 3012 (default)
-- Required for instant push notifications
-- Allows live sync of vault changes
-
-### Current Status
-- Websocket is enabled in the container (port 3012)
-- Not exposed through service/ingress
-
-### Implementation Options
-
-#### Option A: Through Cloudflare Tunnel (Recommended)
-```yaml
-# Add to Cloudflare Tunnel configuration:
-# Public hostname: vaultwarden-ws.gwynbliedd.com
-# Service: http://192.168.100.210:3012
-# Or use the same domain with path: vaultwarden.gwynbliedd.com/notifications/hub
-```
-
-#### Option B: Add to Service and IngressRoute
-```yaml
-# In service configuration
-service:
-  port: 80
-  extraPorts:
-    - name: websocket
-      port: 3012
-      targetPort: 3012
-
-# In IngressRoute (if not using Cloudflare Tunnel)
-# Would need separate route for websocket
-```
-
-### Testing Websocket
-1. Open Vaultwarden web vault
-2. Open browser developer console (F12)
-3. Go to Network tab
-4. Look for WebSocket connections to `/notifications/hub`
-5. Should show "101 Switching Protocols" if working
-
-## Task 4: Future Enhancements
-
-### 4.1 Argon2 Admin Token
+### 1. Argon2 Admin Token (Security Enhancement)
 
 #### What is Argon2?
 - Modern password hashing algorithm
@@ -170,7 +63,7 @@ vaultwarden:
     # Or use existingSecret (recommended)
 ```
 
-### 4.2 Two-Factor Authentication Options
+### 2. Two-Factor Authentication Enhancements
 
 #### Built-in 2FA Methods
 1. **TOTP (Time-based One-Time Password)**
@@ -216,7 +109,7 @@ vaultwarden:
       host: "api-xxxxx.duosecurity.com"
 ```
 
-### 4.3 Additional Security Hardening
+### 3. Advanced Security Hardening
 
 ```yaml
 vaultwarden:
@@ -244,7 +137,7 @@ vaultwarden:
     blacklistRegex: '^(192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+)$'
 ```
 
-### 4.4 Resource Limits and Health Probes
+### 4. Resource Optimization
 
 ```yaml
 resources:
@@ -272,60 +165,85 @@ readinessProbe:
   periodSeconds: 5
 ```
 
+### 5. Automated Backup Strategy
+
+#### Database Backup Script
+```bash
+#!/bin/bash
+# Automated PostgreSQL backup with retention
+BACKUP_DIR="/backups/vaultwarden"
+RETENTION_DAYS=30
+
+# Create backup
+kubectl exec -it vaultwarden-postgres-1 -n vaultwarden -- \
+  pg_dump -U vaultwarden vaultwarden > $BACKUP_DIR/vaultwarden_$(date +%Y%m%d_%H%M%S).sql
+
+# Clean old backups
+find $BACKUP_DIR -name "vaultwarden_*.sql" -mtime +$RETENTION_DAYS -delete
+```
+
+#### Attachments Backup
+```bash
+# Schedule PVC data backup
+kubectl create cronjob vaultwarden-backup --schedule="0 2 * * *" \
+  --image=busybox -- /bin/sh -c \
+  "kubectl cp vaultwarden/vaultwarden-0:/data /backup/vaultwarden_data_$(date +%Y%m%d)"
+```
+
 ## Implementation Priority
 
-1. **Immediate** (Do Now):
-   - Disable open signups
-   - Configure SMTP for email notifications
+### Phase 1: Security (When Time Permits)
+- [ ] Implement Argon2 admin token
+- [ ] Enable 2FA for vault access
+- [ ] Review and strengthen password policies
 
-2. **Short Term** (This Week):
-   - Generate and apply Argon2 admin token
-   - Test websocket connectivity
-   - Enable health probes
+### Phase 2: Reliability (Next Month)
+- [ ] Add health probes and resource limits
+- [ ] Set up automated backups
+- [ ] Implement monitoring alerts
 
-3. **Long Term** (When Needed):
-   - Configure YubiKey if you have one
-   - Set up automated backups
-   - Resource monitoring and limits
+### Phase 3: Advanced Features (Future)
+- [ ] YubiKey support if hardware acquired
+- [ ] Organization features for family sharing
+- [ ] Advanced audit logging
 
-## Testing Checklist
-
-- [ ] Verify signup is restricted
-- [ ] Test email sending (password reset)
-- [ ] Confirm new device login emails work
-- [ ] Check admin panel access with new token
-- [ ] Test 2FA enrollment
-- [ ] Verify websocket sync between devices
-- [ ] Monitor resource usage
-
-## Backup Considerations
-
-### Database Backup
-```bash
-# Manual backup of PostgreSQL
-kubectl exec -it vaultwarden-postgres-1 -n vaultwarden -- \
-  pg_dump -U vaultwarden vaultwarden > vaultwarden_backup_$(date +%Y%m%d).sql
-```
-
-### Attachments Backup
-```bash
-# Backup PVC data
-kubectl cp vaultwarden/vaultwarden-0:/data ./vaultwarden_data_backup_$(date +%Y%m%d)
-```
-
-## Monitoring Commands
+## Quick Reference - Monitoring Commands
 
 ```bash
 # Check logs
-kubectl logs -n vaultwarden vaultwarden-0 -f
+kubectl logs -n vaultwarden deployment/vaultwarden -f
 
-# Check events
+# Check events  
 kubectl get events -n vaultwarden --sort-by='.lastTimestamp'
 
 # Check resource usage
 kubectl top pod -n vaultwarden
 
-# Test SMTP
-kubectl exec -it vaultwarden-0 -n vaultwarden -- \
-  /vaultwarden send-test-email abdulla.amash@gmail.com
+# Verify websocket connectivity
+curl -I -H "Host: vaultwarden.gwynbliedd.com" \
+  -H "Upgrade: websocket" -H "Connection: Upgrade" \
+  http://192.168.100.210/notifications/hub
+
+# Access admin panel
+# URL: https://vaultwarden.gwynbliedd.com/admin
+# Token: kubectl get secret admin-token -n vaultwarden -o jsonpath='{.data.token}' | base64 -d
 ```
+
+## Success Metrics
+
+- ✅ All Bitwarden clients working (web, mobile, extensions)
+- ✅ Real-time sync via websocket
+- ✅ Email notifications functional
+- ✅ Secure admin-only registration
+- ✅ Mobile app compatibility restored
+
+## Notes
+
+- Current version: Vaultwarden 1.34.3-alpine
+- Database: PostgreSQL via CloudNative PG
+- Access: Via Cloudflare Tunnel only
+- Resource usage: ~100MB RAM (efficient!)
+
+---
+*Last updated: September 2025*
+*Status: Production Ready*
