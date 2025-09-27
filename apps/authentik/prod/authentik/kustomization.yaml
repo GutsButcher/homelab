@@ -3,6 +3,7 @@ kind: Kustomization
 resources:
   - ../../base
   - ingressroute.yaml
+  - headers-middleware.yaml
 
 patchesStrategicMerge:
   - helmrelease-patch.yaml

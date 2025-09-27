@@ -12,3 +12,6 @@ spec:
       services:
         - name: authentik-server
           port: 80
+      middlewares:
+        - name: authentik-headers
+          namespace: authentik

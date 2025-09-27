@@ -5,14 +5,18 @@ metadata:
   namespace: authentik
 spec:
   values:
+    server:
+      env:
+        - name: AUTHENTIK_LISTEN__TRUSTED_PROXY_CIDRS
+          value: "10.42.0.0/16,10.43.0.0/16,192.168.100.0/24"
     authentik:
       secret_key: "cfa3Gk1NPfTe5WmQhpkk04Kvw6XDvwIqjI58icxMvQ2MVQ6BxS"
-      email:
-        host: "smtp.gmail.com"
-        port: 587
-        username: "abdulla.amash@gmail.com"
-        password: "gita yyrq iuax dtxd"
-        from: "abdulla.amash@gmail.com"
+      # email:
+      #   host: "smtp.gmail.com"
+      #   port: 587
+      #   username: "abdulla.amash@gmail.com"
+      #   password: ""
+      #   from: "abdulla.amash@gmail.com"
       postgresql:
         password: "postgresql_password"
     postgresql:
