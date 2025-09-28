@@ -7,9 +7,6 @@ spec:
   values:
     nextcloud:
       host: cloud.gwynbliedd.com
-      extraEnv:
-        - name: NEXTCLOUD_TRUSTED_DOMAINS
-          value: "cloud.gwynbliedd.com,nextcloud.gwynbliedd.com,storage.gwynbliedd.com"
       existingSecret:
         enabled: true
         secretName: nextcloud-credentials
@@ -31,9 +28,3 @@ spec:
         secretName: nextcloud-db-credentials
         usernameKey: username
         passwordKey: password
-    livenessProbe:
-      enabled: false
-    readinessProbe:
-      enabled: false
-
-    
