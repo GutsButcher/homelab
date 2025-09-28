@@ -1,33 +1,30 @@
 apiVersion: helm.toolkit.fluxcd.io/v2beta1
 kind: HelmRelease
 metadata:
-  name: authentik
-  namespace: authentik
+  name: nextcloud
+  namespace: nextcloud
 spec:
   values:
-    server:
-      ingress:
+    nextcloud:
+      host: cloud.gwynbliedd.com
+      existingSecret:
         enabled: true
-        ingressClassName: traefik
-        hosts:
-          - auth.gwynbliedd.com
-        tls: []
-      env:
-        - name: AUTHENTIK_LISTEN__TRUSTED_PROXY_CIDRS
-          value: "10.42.0.0/16,10.43.0.0/16,192.168.100.0/24"
-    authentik:
-      secret_key: "cfa3Gk1NPfTe5WmQhpkk04Kvw6XDvwIqjI58icxMvQ2MVQ6BxS"
-      # email:
-      #   host: "smtp.gmail.com"
-      #   port: 587
-      #   username: "abdulla.amash@gmail.com"
-      #   password: ""
-      #   from: "abdulla.amash@gmail.com"
-      postgresql:
-        password: "postgresql_password"
-    postgresql:
-      enabled: true
-      auth:
-       password: "postgresql_password"
-    redis:
-      enabled: true
+        secretName: nextcloud-credentials
+        usernameKey: username
+        passwordKey: password
+        tokenKey: token
+        smtpUsernameKey: smtp-username
+        smtpPasswordKey: smtp-password
+        smtpHostKey: smtp-host
+      externalDatabase:
+        enabled: true
+        type: postgresql 
+        host: nextcloud-postgres-rw.nextcloud.svc.cluster.local
+        database: nextcloud
+        existingSecret:
+          enabled: true
+          secretName: nextcloud-db-credentials
+          usernameKey: username
+          passwordKey: password
+
+    

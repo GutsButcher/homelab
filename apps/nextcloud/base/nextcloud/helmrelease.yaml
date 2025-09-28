@@ -1,15 +1,15 @@
 apiVersion: helm.toolkit.fluxcd.io/v2beta1
 kind: HelmRelease
 metadata:
-  name: authentik
-  namespace: authentik
+  name: nextcloud
+  namespace: nextcloud
 spec:
   interval: 30m
   chart:
     spec:
-      chart: authentik
-      version: ">=2025.8.3 <2026.0.0"
+      chart: nextcloud
+      version: ">=8.0.2 <9.0.0"
       sourceRef:
         kind: HelmRepository
-        name: goauthentik # the Chart is jameswynn/homepage
+        name: nextcloud # the Chart is nextcloud/nextcloud
         namespace: flux-system

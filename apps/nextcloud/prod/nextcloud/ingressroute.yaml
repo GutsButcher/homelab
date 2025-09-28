@@ -1,0 +1,14 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: nextcloud
+  namespace: nextcloud
+spec:
+  entryPoints:
+    - web
+  routes:
+    - match:  Host(`nextcloud.gwynbliedd.com`) || Host(`cloud.gwynbliedd.com`) || Host(`storage.gwynbliedd.com`)
+      kind: Rule
+      services:
+        - name: nextcloud
+          port: 8080
