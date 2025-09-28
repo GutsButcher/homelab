@@ -13,3 +13,4 @@ resources:
   - vaultwarden
   - syncthing
   - nextcloud
+  - authentik
