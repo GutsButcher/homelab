@@ -19,16 +19,16 @@ spec:
         smtpUsernameKey: smtp-username
         smtpPasswordKey: smtp-password
         smtpHostKey: smtp-host
-      externalDatabase:
+    externalDatabase:
+      enabled: true
+      type: postgresql 
+      host: nextcloud-postgres-rw.nextcloud.svc.cluster.local
+      database: nextcloud
+      existingSecret:
         enabled: true
-        type: postgresql 
-        host: nextcloud-postgres-rw.nextcloud.svc.cluster.local
-        database: nextcloud
-        existingSecret:
-          enabled: true
-          secretName: nextcloud-db-credentials
-          usernameKey: username
-          passwordKey: password
+        secretName: nextcloud-db-credentials
+        usernameKey: username
+        passwordKey: password
         
 
     
