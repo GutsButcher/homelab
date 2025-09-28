@@ -5,29 +5,29 @@ metadata:
   namespace: authentik
 spec:
   values:
-    server:
-      ingress:
-        enabled: true
-        ingressClassName: traefik
-        hosts:
-          - auth.gwynbliedd.com
-        tls: []
-      env:
-        - name: AUTHENTIK_LISTEN__TRUSTED_PROXY_CIDRS
-          value: "10.42.0.0/16,10.43.0.0/16,192.168.100.0/24"
+    global:
+        env:
+            - name: AUTHENTIK_HOST
+              value: "https://auth.gwynbliedd.com"
+            - name: AUTHENTIK_HOST_BROWSER
+              value: "https://auth.gwynbliedd.com"
+        envFrom:
+            - secretRef:
+                  name: authentik-secrets
+
     authentik:
-      secret_key: "cfa3Gk1NPfTe5WmQhpkk04Kvw6XDvwIqjI58icxMvQ2MVQ6BxS"
-      # email:
-      #   host: "smtp.gmail.com"
-      #   port: 587
-      #   username: "abdulla.amash@gmail.com"
-      #   password: ""
-      #   from: "abdulla.amash@gmail.com"
-      postgresql:
-        password: "postgresql_password"
-    postgresql:
-      enabled: true
-      auth:
-       password: "postgresql_password"
+        error_reporting:
+            enabled: true
+        postgresql:
+            host: authentik-postgres-rw.authentik.svc.cluster.local
+            name: authentik
+            user: authentik
+    server:
+        ingress:
+            # Specify kubernetes ingress controller class name
+            ingressClassName: traefik
+            enabled: true
+            hosts:
+                - auth.gwynbliedd.com
     redis:
-      enabled: true
+        enabled: true
