@@ -16,3 +16,4 @@ resources:
   - vaultwarden.yaml
   - pihole.yaml
   - goauthentik.yaml
+  - nextcloud.yaml
