@@ -82,7 +82,7 @@ spec:
                 description: Homelab DNS
                 icon: pi-hole
             - Nextcloud:
-                href: https://nextcloud.gwynbliedd.com/
+                href: https://cloud.gwynbliedd.com/
                 description: Cloud storage and services
                 icon: nextcloud
 
