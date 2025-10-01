@@ -1,0 +1,117 @@
+---
+# PersistentVolumeClaim for Kavita Config
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: kavita-config-pvc
+  namespace: books-library
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 1Gi
+
+---
+# PersistentVolumeClaim for Books Data
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: kavita-data-pvc
+  namespace: books-library
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 5Gi
+
+---
+# Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kavita
+  namespace: books-library
+  labels:
+    app: kavita
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kavita
+  template:
+    metadata:
+      labels:
+        app: kavita
+    spec:
+      containers:
+      - name: kavita
+        image: lscr.io/linuxserver/kavita:latest
+        env:
+        - name: PUID
+          value: "1000"
+        - name: PGID
+          value: "1000"
+        - name: TZ
+          value: "Asia/Bahrain"
+        ports:
+        - containerPort: 5000
+          name: http
+        volumeMounts:
+        - name: config
+          mountPath: /config
+        - name: data
+          mountPath: /data
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+      volumes:
+      - name: config
+        persistentVolumeClaim:
+          claimName: kavita-config-pvc
+      - name: data
+        persistentVolumeClaim:
+          claimName: kavita-data-pvc
+
+---
+# Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: kavita
+  namespace: books-library
+  labels:
+    app: kavita
+spec:
+  type: ClusterIP
+  ports:
+  - port: 5000
+    targetPort: 5000
+    protocol: TCP
+    name: http
+  selector:
+    app: kavita
+
+---
+# IngressRoute (Traefik)
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: kavita
+  namespace: books-library
+spec:
+  entryPoints:
+    - web
+  routes:
+  - match: Host(`kavita.gwynbliedd.com`)
+    kind: Rule
+    services:
+    - name: kavita
+      port: 5000
