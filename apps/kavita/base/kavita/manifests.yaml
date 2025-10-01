@@ -110,7 +110,7 @@ spec:
   entryPoints:
     - web
   routes:
-  - match: Host(`kavita.gwynbliedd.com`)
+  - match: Host(`books.gwynbliedd.com`)
     kind: Rule
     services:
     - name: kavita
