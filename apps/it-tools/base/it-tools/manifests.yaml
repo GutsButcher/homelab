@@ -1,0 +1,60 @@
+---
+# Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: it-tools
+  namespace: it-tools
+  labels:
+    app: it-tools
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: it-tools
+  template:
+    metadata:
+      labels:
+        app: it-tools
+    spec:
+      containers:
+      - name: it-tools
+        image: corentinth/it-tools
+        ports:
+        - containerPort: 80
+          name: http
+---
+# Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: it-tools
+  namespace: it-tools
+  labels:
+    app: it-tools
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8080
+    targetPort: 80
+    protocol: TCP
+    name: http
+  selector:
+    app: it-tools
+
+---
+# IngressRoute (Traefik)
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: it-tools
+  namespace: it-tools
+spec:
+  entryPoints:
+    - web
+  routes:
+  - match: Host(`tools.gwynbliedd.com`)
+    kind: Rule
+    services:
+    - name: it-tools
+      port: 8080
