@@ -58,3 +58,6 @@ spec:
     services:
     - name: it-tools
       port: 8080
+    middlewares:
+      - name: authentik-forwardauth
+        namespace: homepage
