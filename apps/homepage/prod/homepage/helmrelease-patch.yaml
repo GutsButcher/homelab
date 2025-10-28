@@ -87,9 +87,9 @@ spec:
                 icon: syncthing
         - DevOps Tools:
             - Terraform:
-              href: https://terraform.gwynbliedd.com
-              description: self-hosted terraform cloud
-              icon: hashicorp-terraform
+                href: https://terraform.gwynbliedd.com
+                description: self-hosted terraform cloud
+                icon: hashicorp-terraform
             - n8n:
                 href: https://n8n.gwynbliedd.com/
                 description: n8n self-hosted automation service
