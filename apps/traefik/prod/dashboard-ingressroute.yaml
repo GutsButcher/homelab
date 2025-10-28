@@ -10,5 +10,5 @@ spec:
     - match: Host(`traefik.gwynbliedd.com`)
       kind: Rule
       services:
-        - name: traefik-dashboard
-          port: 8080
+        - name: api@internal
+          kind: TraefikService
