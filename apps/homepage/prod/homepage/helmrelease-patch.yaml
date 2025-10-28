@@ -77,6 +77,10 @@ spec:
                 href: https://traefik.gwynbliedd.com/dashboard/
                 description: traefik UI
                 icon: traefik
+            - VaultWarden:
+                href: https://vaultwarden.gwynbliedd.com/
+                description: Passwords and Secrets Manager
+                icon: vaultwarden
             - Syncthing:
                 href: https://syncthing.gwynbliedd.com/
                 description: Syncronized shared storage
@@ -90,10 +94,11 @@ spec:
                 href: https://wallabag.gwynbliedd.com/
                 description: Read it later service
                 icon: wallabag
-            - VaultWarden:
-                href: https://vaultwarden.gwynbliedd.com/
-                description: Passwords and Secrets Manager
-                icon: vaultwarden
+            - it-tools:
+                href: https://tools.gwynbliedd.com/
+                description: it-tools kit
+                icon: it-tools
+
         - Other:
             - Linkding:
                 href: https://linkding.gwynbliedd.com/
