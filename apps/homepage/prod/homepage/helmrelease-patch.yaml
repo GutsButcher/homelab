@@ -94,10 +94,6 @@ spec:
                 href: https://n8n.gwynbliedd.com/
                 description: n8n self-hosted automation service
                 icon: n8n
-            - Wallabag:
-                href: https://wallabag.gwynbliedd.com/
-                description: Read it later service
-                icon: wallabag
             - it-tools:
                 href: https://tools.gwynbliedd.com/
                 description: it-tools kit
@@ -110,6 +106,10 @@ spec:
                 href: https://books.gwynbliedd.com/
                 description: books library
                 icon: kavita
+            - Wallabag:
+                href: https://wallabag.gwynbliedd.com/
+                description: Read it later service
+                icon: wallabag
             - CommaFeed:
                 href: https://www.commafeed.com/#/app/category/all
                 description: CommaFeed RSS reader
