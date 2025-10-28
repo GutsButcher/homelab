@@ -73,28 +73,15 @@ spec:
                 href: https://pgadmin.gwynbliedd.com/
                 description: DB control panel
                 icon: postgresql
+            - Traefik:
+                href: https://traefik.gwynbliedd.com/dashboard/
+                description: traefik UI
+                icon: traefik
             - Syncthing:
                 href: https://syncthing.gwynbliedd.com/
                 description: Syncronized shared storage
                 icon: syncthing
-            - Pi-Hole:
-                href: https://pi-hole.gwynbliedd.com/
-                description: Homelab DNS
-                icon: pi-hole
-            - Nextcloud:
-                href: https://cloud.gwynbliedd.com/
-                description: Cloud storage and services
-                icon: nextcloud
-
         - DevOps Tools:
-            - Jenkins:
-                href: https://jenkins.gwynbliedd.com/
-                description: jenkins self hosted service
-                icon: jenkins
-            - Ansible:
-                href: https://awx.gwynbliedd.com/
-                description: Ansible AWX server
-                icon: ansible
             - n8n:
                 href: https://n8n.gwynbliedd.com/
                 description: n8n self hosted automation service
@@ -107,11 +94,14 @@ spec:
                 href: https://vaultwarden.gwynbliedd.com/
                 description: Passwords and Secrets Manager
                 icon: vaultwarden
-
         - Other:
             - Linkding:
                 href: https://linkding.gwynbliedd.com/
                 icon: linkding
+            - Kavita:
+                href: https://books.gwynbliedd.com/
+                description: books library
+                icon: kavita
             - YouTube:
                 href: https://www.youtube.com
                 icon: youtube
@@ -122,10 +112,6 @@ spec:
                 href: https://www.commafeed.com/#/app/category/all
                 description: CommaFeed RSS reader
                 icon: commafeed
-            - Gwent:
-                href: https://gwent.gwynbliedd.com/
-                description: gwent from witcher3
-                icon: /icons/witcher3
       widgets:
         - resources:
             # change backend to 'kubernetes' to use Kubernetes integration. Requires RBAC.
