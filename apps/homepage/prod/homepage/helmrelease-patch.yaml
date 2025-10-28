@@ -107,16 +107,14 @@ spec:
                 href: https://books.gwynbliedd.com/
                 description: books library
                 icon: kavita
-            - YouTube:
-                href: https://www.youtube.com
-                icon: youtube
-            - X:
-                href: https://www.x.com
-                icon: /icons/x.webp
             - CommaFeed:
                 href: https://www.commafeed.com/#/app/category/all
                 description: CommaFeed RSS reader
-                icon: commafeed
+                icon: commafeed    
+            - YouTube:
+                href: https://www.youtube.com
+                icon: youtube
+
       widgets:
         - resources:
             # change backend to 'kubernetes' to use Kubernetes integration. Requires RBAC.
@@ -141,7 +139,7 @@ spec:
               memory: true
               showLabel: true
       kubernetes:
-        # change mode to 'cluster' to use RBAC service account
+        # set mode to 'cluster' to use RBAC service account
         mode: cluster
         # Uncomment to enable gateway api HttpRoute discovery.
         #gateway: true
