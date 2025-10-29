@@ -67,41 +67,32 @@ spec:
         - Infrastructure:
             - Grafana Dashboards:
                 href: https://grafana.gwynbliedd.com/
-                description: monitor infrastructure
                 icon: grafana
             - PGAdmin:
                 href: https://pgadmin.gwynbliedd.com/
-                description: DB control panel
                 icon: postgresql
             - Traefik:
                 href: https://traefik.gwynbliedd.com/dashboard/
-                description: traefik UI
                 icon: traefik
             - VaultWarden:
                 href: https://vaultwarden.gwynbliedd.com/
-                description: Passwords and Secrets Manager
                 icon: vaultwarden
             - Syncthing:
                 href: https://syncthing.gwynbliedd.com/
-                description: Syncronized shared storage
                 icon: syncthing
             - Authentik:
                 href: https://auth.gwynbliedd.com/
-                description: authentik managament
                 icon: authentik
             - PGAdmin:
         - DevOps Tools:
             - Terraform:
                 href: https://terraform.gwynbliedd.com
-                description: self-hosted terraform cloud
                 icon: hashicorp-terraform
             - n8n:
                 href: https://n8n.gwynbliedd.com/
-                description: n8n self-hosted automation service
                 icon: n8n
             - it-tools:
                 href: https://tools.gwynbliedd.com/
-                description: it-tools kit
                 icon: it-tools
         - Other:
             - Linkding:
@@ -109,15 +100,12 @@ spec:
                 icon: linkding
             - Kavita:
                 href: https://books.gwynbliedd.com/
-                description: books library
                 icon: kavita
             - Wallabag:
                 href: https://wallabag.gwynbliedd.com/
-                description: Read it later service
                 icon: wallabag
             - CommaFeed:
                 href: https://www.commafeed.com/#/app/category/all
-                description: CommaFeed RSS reader
                 icon: commafeed    
             - YouTube:
                 href: https://www.youtube.com
