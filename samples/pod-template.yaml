@@ -1,0 +1,263 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: example-pod
+  namespace: default
+  labels:
+    app: myapp
+    environment: production
+    version: v1.0.0
+  annotations:
+    description: "Comprehensive pod template with common specs"
+spec:
+  # Service Account
+  serviceAccountName: default
+
+  # Security Context (pod-level)
+  securityContext:
+    runAsUser: 1000
+    runAsGroup: 3000
+    fsGroup: 2000
+    runAsNonRoot: true
+    seccompProfile:
+      type: RuntimeDefault
+
+  # Init Containers (run before main containers)
+  initContainers:
+  - name: init-setup
+    image: busybox:1.36
+    command: ['sh', '-c', 'echo "Initializing..." && sleep 5']
+    securityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+        - ALL
+
+  # Main Containers
+  containers:
+  - name: app
+    image: nginx:1.25-alpine
+    imagePullPolicy: IfNotPresent
+
+    # Command and Args
+    command: ["/bin/sh"]
+    args: ["-c", "nginx -g 'daemon off;'"]
+
+    # Ports
+    ports:
+    - name: http
+      containerPort: 80
+      protocol: TCP
+    - name: https
+      containerPort: 443
+      protocol: TCP
+
+    # Environment Variables
+    env:
+    - name: ENV_VAR_EXAMPLE
+      value: "some-value"
+    - name: SECRET_USERNAME
+      valueFrom:
+        secretKeyRef:
+          name: my-secret
+          key: username
+    - name: CONFIG_VALUE
+      valueFrom:
+        configMapKeyRef:
+          name: my-config
+          key: config-key
+    - name: POD_NAME
+      valueFrom:
+        fieldRef:
+          fieldPath: metadata.name
+    - name: POD_NAMESPACE
+      valueFrom:
+        fieldRef:
+          fieldPath: metadata.namespace
+    - name: POD_IP
+      valueFrom:
+        fieldRef:
+          fieldPath: status.podIP
+
+    # Resource Limits and Requests
+    resources:
+      requests:
+        memory: "128Mi"
+        cpu: "250m"
+      limits:
+        memory: "256Mi"
+        cpu: "500m"
+
+    # Liveness Probe (restart container if fails)
+    livenessProbe:
+      httpGet:
+        path: /healthz
+        port: http
+        scheme: HTTP
+      initialDelaySeconds: 30
+      periodSeconds: 10
+      timeoutSeconds: 5
+      successThreshold: 1
+      failureThreshold: 3
+
+    # Readiness Probe (remove from service if fails)
+    readinessProbe:
+      httpGet:
+        path: /ready
+        port: http
+      initialDelaySeconds: 10
+      periodSeconds: 5
+      timeoutSeconds: 3
+      successThreshold: 1
+      failureThreshold: 3
+
+    # Startup Probe (for slow-starting containers)
+    startupProbe:
+      httpGet:
+        path: /startup
+        port: http
+      initialDelaySeconds: 0
+      periodSeconds: 10
+      timeoutSeconds: 3
+      successThreshold: 1
+      failureThreshold: 30
+
+    # Volume Mounts
+    volumeMounts:
+    - name: config-volume
+      mountPath: /etc/config
+      readOnly: true
+    - name: secret-volume
+      mountPath: /etc/secrets
+      readOnly: true
+    - name: data-volume
+      mountPath: /data
+    - name: emptydir-volume
+      mountPath: /cache
+
+    # Security Context (container-level)
+    securityContext:
+      allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: true
+      capabilities:
+        drop:
+        - ALL
+        add:
+        - NET_BIND_SERVICE
+
+    # Lifecycle Hooks
+    lifecycle:
+      postStart:
+        exec:
+          command: ["/bin/sh", "-c", "echo 'Container started'"]
+      preStop:
+        exec:
+          command: ["/bin/sh", "-c", "sleep 15"]
+
+  # Volumes
+  volumes:
+  - name: config-volume
+    configMap:
+      name: my-config
+  - name: secret-volume
+    secret:
+      secretName: my-secret
+  - name: data-volume
+    persistentVolumeClaim:
+      claimName: my-pvc
+  - name: emptydir-volume
+    emptyDir: {}
+
+  # Restart Policy
+  restartPolicy: Always
+
+  # DNS Policy
+  dnsPolicy: ClusterFirst
+
+  # DNS Config
+  dnsConfig:
+    nameservers:
+    - 1.1.1.1
+    searches:
+    - ns1.svc.cluster.local
+    options:
+    - name: ndots
+      value: "2"
+
+  # Host Aliases
+  hostAliases:
+  - ip: "127.0.0.1"
+    hostnames:
+    - "localhost"
+
+  # Node Selection
+  nodeSelector:
+    disktype: ssd
+    kubernetes.io/hostname: node-1
+
+  # Affinity Rules
+  affinity:
+    # Node Affinity
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: kubernetes.io/arch
+            operator: In
+            values:
+            - amd64
+            - arm64
+      preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        preference:
+          matchExpressions:
+          - key: node-role
+            operator: In
+            values:
+            - worker
+
+    # Pod Affinity
+    podAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+            - key: app
+              operator: In
+              values:
+              - cache
+          topologyKey: kubernetes.io/hostname
+
+    # Pod Anti-Affinity
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+      - labelSelector:
+          matchExpressions:
+          - key: app
+            operator: In
+            values:
+            - myapp
+        topologyKey: kubernetes.io/hostname
+
+  # Tolerations
+  tolerations:
+  - key: "key1"
+    operator: "Equal"
+    value: "value1"
+    effect: "NoSchedule"
+  - key: "key2"
+    operator: "Exists"
+    effect: "NoExecute"
+    tolerationSeconds: 3600
+
+  # Priority
+  priorityClassName: high-priority
+
+  # Termination Grace Period
+  terminationGracePeriodSeconds: 30
+
+  # Host Network
+  hostNetwork: false
+  hostPID: false
+  hostIPC: false

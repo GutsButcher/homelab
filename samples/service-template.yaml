@@ -1,0 +1,197 @@
+---
+# ClusterIP Service (default, internal cluster access)
+apiVersion: v1
+kind: Service
+metadata:
+  name: example-service-clusterip
+  namespace: default
+  labels:
+    app: myapp
+  annotations:
+    description: "ClusterIP service for internal cluster access"
+spec:
+  type: ClusterIP
+
+  # Selector (matches pod labels)
+  selector:
+    app: myapp
+
+  # Ports
+  ports:
+  - name: http
+    protocol: TCP
+    port: 80          # Service port
+    targetPort: 8080  # Container port (can be port number or name)
+  - name: https
+    protocol: TCP
+    port: 443
+    targetPort: https
+
+  # Session Affinity
+  sessionAffinity: ClientIP
+  sessionAffinityConfig:
+    clientIP:
+      timeoutSeconds: 10800
+
+  # IP Family
+  ipFamilies:
+  - IPv4
+  ipFamilyPolicy: SingleStack
+
+---
+# NodePort Service (external access via node IP:port)
+apiVersion: v1
+kind: Service
+metadata:
+  name: example-service-nodeport
+  namespace: default
+  labels:
+    app: myapp
+  annotations:
+    description: "NodePort service for external access"
+spec:
+  type: NodePort
+
+  selector:
+    app: myapp
+
+  ports:
+  - name: http
+    protocol: TCP
+    port: 80
+    targetPort: 8080
+    nodePort: 30080  # External port on nodes (30000-32767)
+
+  # External Traffic Policy
+  externalTrafficPolicy: Local  # Preserves source IP
+
+---
+# LoadBalancer Service (cloud provider load balancer)
+apiVersion: v1
+kind: Service
+metadata:
+  name: example-service-loadbalancer
+  namespace: default
+  labels:
+    app: myapp
+  annotations:
+    description: "LoadBalancer service for cloud provider LB"
+    # Cloud-specific annotations (example for AWS)
+    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+    service.beta.kubernetes.io/aws-load-balancer-scheme: "internet-facing"
+spec:
+  type: LoadBalancer
+
+  selector:
+    app: myapp
+
+  ports:
+  - name: http
+    protocol: TCP
+    port: 80
+    targetPort: 8080
+
+  # External Traffic Policy
+  externalTrafficPolicy: Local
+
+  # Load Balancer Source Ranges (whitelist IPs)
+  loadBalancerSourceRanges:
+  - "10.0.0.0/8"
+  - "192.168.0.0/16"
+
+---
+# Headless Service (no cluster IP, for StatefulSets)
+apiVersion: v1
+kind: Service
+metadata:
+  name: example-service-headless
+  namespace: default
+  labels:
+    app: myapp
+  annotations:
+    description: "Headless service for direct pod access"
+spec:
+  type: ClusterIP
+  clusterIP: None  # Makes it headless
+
+  selector:
+    app: myapp
+
+  ports:
+  - name: http
+    protocol: TCP
+    port: 80
+    targetPort: 8080
+
+  # Publish not ready addresses
+  publishNotReadyAddresses: true
+
+---
+# ExternalName Service (DNS CNAME alias)
+apiVersion: v1
+kind: Service
+metadata:
+  name: example-service-externalname
+  namespace: default
+  annotations:
+    description: "ExternalName service for external DNS mapping"
+spec:
+  type: ExternalName
+  externalName: external-service.example.com
+  ports:
+  - name: http
+    protocol: TCP
+    port: 80
+
+---
+# Multi-Port Service with Advanced Configuration
+apiVersion: v1
+kind: Service
+metadata:
+  name: example-service-advanced
+  namespace: default
+  labels:
+    app: myapp
+    tier: backend
+  annotations:
+    description: "Advanced multi-port service configuration"
+spec:
+  type: ClusterIP
+
+  selector:
+    app: myapp
+    tier: backend
+
+  # Multiple Ports
+  ports:
+  - name: http
+    protocol: TCP
+    port: 80
+    targetPort: http-port  # Named port reference
+  - name: https
+    protocol: TCP
+    port: 443
+    targetPort: 8443
+  - name: grpc
+    protocol: TCP
+    port: 9090
+    targetPort: grpc-port
+  - name: metrics
+    protocol: TCP
+    port: 9091
+    targetPort: metrics
+
+  # Session Affinity
+  sessionAffinity: ClientIP
+  sessionAffinityConfig:
+    clientIP:
+      timeoutSeconds: 3600
+
+  # IP Families (dual-stack)
+  ipFamilies:
+  - IPv4
+  - IPv6
+  ipFamilyPolicy: PreferDualStack
+
+  # Internal Traffic Policy
+  internalTrafficPolicy: Local
