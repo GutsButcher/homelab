@@ -85,6 +85,11 @@ spec:
                 href: https://syncthing.gwynbliedd.com/
                 description: Syncronized shared storage
                 icon: syncthing
+            - Authentik:
+                href: https://auth.gwynbliedd.com/
+                description: authentik managament
+                icon: authentik
+            - PGAdmin:
         - DevOps Tools:
             - Terraform:
                 href: https://terraform.gwynbliedd.com
