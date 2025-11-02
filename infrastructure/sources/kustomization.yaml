@@ -17,3 +17,4 @@ resources:
   - pihole.yaml
   - goauthentik.yaml
   - nextcloud.yaml
+  - gitea.yaml
