@@ -85,6 +85,9 @@ spec:
                 icon: authentik
             - PGAdmin:
         - DevOps Tools:
+            - Gitea:
+                href: https://gitea.gwynbliedd.com
+                icon: gitea
             - Terraform:
                 href: https://terraform.gwynbliedd.com
                 icon: hashicorp-terraform

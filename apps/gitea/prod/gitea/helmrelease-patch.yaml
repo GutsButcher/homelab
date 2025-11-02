@@ -1,0 +1,30 @@
+apiVersion: helm.toolkit.fluxcd.io/v2beta1
+kind: HelmRelease
+metadata:
+  name: gitea
+  namespace: gitea
+spec:
+  values:
+    nodeSelector:
+      kubernetes.io/hostname: worker-node
+    tolerations:
+      - key: "node"
+        operator: "Equal"
+        value: "gcp"
+        effect: "NoSchedule"
+    # ADD hostPath volume
+    extraVolumes:
+      - name: gitea-gcp-storage
+        hostPath:
+          path: /storage/gitea
+          type: DirectoryOrCreate
+
+    # MOUNT it to the Gitea container
+    extraContainerVolumeMounts:
+      - name: gitea-gcp-storage
+        mountPath: /data  # Default Gitea data path
+
+    # Also mount to init containers (Gitea needs this for initialization)
+    extraInitVolumeMounts:
+      - name: gitea-gcp-storage
+        mountPath: /data
