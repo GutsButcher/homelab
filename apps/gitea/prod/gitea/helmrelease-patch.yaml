@@ -10,7 +10,7 @@ spec:
     tolerations:
       - key: "node"
         operator: "Equal"
-        value: "gcp"
+        value: "worker-node"
         effect: "NoSchedule"
 
     # Disable built-in PostgreSQL HA subchart - using CNPG instead
