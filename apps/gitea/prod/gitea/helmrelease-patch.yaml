@@ -21,6 +21,11 @@ spec:
     # Configure Gitea to use external CNPG database
     gitea:
       config:
+        APP_NAME: "Gitea: With a cup of tea."
+        repository:
+        ROOT: "~/gitea-repositories"
+        repository.pull-request:
+          WORK_IN_PROGRESS_PREFIXES: "WIP:,[WIP]:"
         database:
           DB_TYPE: postgres
           HOST: gitea-postgres-rw.gitea.svc.cluster.local:5432
