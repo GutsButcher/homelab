@@ -28,11 +28,11 @@ spec:
           USER: gitea
           PASSWD: Asd424941_a
           SCHEMA: public
-    persistence:
-      enabled: true
-      create: true
-      mount: true
-      size: 20Gi
-      accessModes:
-        - ReadWriteOnce
-      storageClass: "gcs-storage"
+    # persistence:
+    #   enabled: true
+    #   create: true
+    #   mount: true
+    #   size: 20Gi
+    #   accessModes:
+    #     - ReadWriteOnce
+    #   storageClass: "gcs-storage"
