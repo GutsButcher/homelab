@@ -19,30 +19,30 @@ spec:
 
     # Configure Gitea to use external CNPG database
     gitea:
-      config:
-        database:
-          DB_TYPE: postgres
-          HOST: gitea-postgres-rw.gitea.svc.cluster.local:5432
-          NAME:
-            valueFrom:
-              secretKeyRef:
-                name: gitea-postgres-credentials
-                key: database
-          USER:
-            valueFrom:
-              secretKeyRef:
-                name: gitea-postgres-credentials
-                key: username
-          PASSWD:
-            valueFrom:
-              secretKeyRef:
-                name: gitea-postgres-credentials
-                key: password
-          SCHEMA:
-            valueFrom:
-              secretKeyRef:
-                name: gitea-postgres-credentials
-                key: schema
+      # config:
+      #   database:
+      #     DB_TYPE: postgres
+      #     HOST: gitea-postgres-rw.gitea.svc.cluster.local:5432
+      #     NAME:
+      #       valueFrom:
+      #         secretKeyRef:
+      #           name: gitea-postgres-credentials
+      #           key: database
+      #     USER:
+      #       valueFrom:
+      #         secretKeyRef:
+      #           name: gitea-postgres-credentials
+      #           key: username
+      #     PASSWD:
+      #       valueFrom:
+      #         secretKeyRef:
+      #           name: gitea-postgres-credentials
+      #           key: password
+      #     SCHEMA:
+      #       valueFrom:
+      #         secretKeyRef:
+      #           name: gitea-postgres-credentials
+      #           key: schema
     persistence:
       enabled: true
       create: true
