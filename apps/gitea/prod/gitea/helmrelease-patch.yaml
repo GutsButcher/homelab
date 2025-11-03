@@ -43,20 +43,12 @@ spec:
               secretKeyRef:
                 name: gitea-postgres-credentials
                 key: schema
-
-    # ADD hostPath volume
-    extraVolumes:
-      - name: gitea-gcp-storage
-        hostPath:
-          path: /storage/gitea
-          type: DirectoryOrCreate
-
-    # MOUNT it to the Gitea container
-    extraContainerVolumeMounts:
-      - name: gitea-gcp-storage
-        mountPath: /data  # Default Gitea data path
-
-    # Also mount to init containers (Gitea needs this for initialization)
-    extraInitVolumeMounts:
-      - name: gitea-gcp-storage
-        mountPath: /data
+    persistence:
+      enabled: true
+      create: true
+      mount: true
+      claimName: gitea-shared-storage
+      size: 20Gi
+      accessModes:
+        - ReadWriteOnce
+      storageClass: "gcs-storage"
