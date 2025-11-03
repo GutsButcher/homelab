@@ -43,12 +43,11 @@ spec:
               secretKeyRef:
                 name: gitea-postgres-credentials
                 key: schema
-    # persistence:
-    #   enabled: true
-    #   create: true
-    #   mount: true
-    #   claimName: gitea-shared-storage
-    #   size: 20Gi
-    #   accessModes:
-    #     - ReadWriteOnce
-    #   storageClass: "gcs-storage"
+    persistence:
+      enabled: true
+      create: true
+      mount: true
+      size: 20Gi
+      accessModes:
+        - ReadWriteOnce
+      storageClass: "gcs-storage"
