@@ -20,6 +20,8 @@ spec:
     enabled: false
     # Configure Gitea to use external CNPG database
     gitea:
+      admin:
+        existingSecret: gitea-admin-secret
       config:
         APP_NAME: "Gitea: With a cup of tea."
         repository:

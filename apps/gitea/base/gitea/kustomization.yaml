@@ -4,3 +4,4 @@ resources:
   - helmrelease.yaml
   - cnpg.yaml
   - cnpg-secret.yaml
+  - admin-secret.yaml
