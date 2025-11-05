@@ -52,11 +52,11 @@ spec:
             secretKeyRef:
               name: gitea-postgres-credentials
               key: schema
-    persistence:
-      enabled: true
-      create: true
-      mount: true
-      size: 10Gi
-      storageClass: local-path
-      accessModes:
-        - ReadWriteOnce
+    # persistence:
+    #   enabled: true
+    #   create: true
+    #   mount: true
+    #   size: 10Gi
+    #   storageClass: local-path
+    #   accessModes:
+    #     - ReadWriteOnce
