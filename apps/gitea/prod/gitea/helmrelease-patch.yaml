@@ -18,7 +18,11 @@ spec:
       enabled: false
     postgresql:
     enabled: false
-    # Configure Gitea to use external CNPG database
+    # Disable built-in valkey-cluster subchart - using standalone redis
+    valkey-cluster:
+      enabled: false
+    valkey:
+      enabled: true
     gitea:
       admin:
         existingSecret: gitea-admin-secret
@@ -52,11 +56,11 @@ spec:
             secretKeyRef:
               name: gitea-postgres-credentials
               key: schema
-    # persistence:
-    #   enabled: true
-    #   create: true
-    #   mount: true
-    #   size: 10Gi
-    #   storageClass: local-path
-    #   accessModes:
-    #     - ReadWriteOnce
+    persistence:
+      enabled: true
+      create: true
+      mount: true
+      size: 10Gi
+      storageClass: local-path
+      accessModes:
+        - ReadWriteOnce
