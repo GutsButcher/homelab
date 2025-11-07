@@ -18,3 +18,4 @@ resources:
   - goauthentik.yaml
   - nextcloud.yaml
   - gitea.yaml
+  - bitnami.yaml
