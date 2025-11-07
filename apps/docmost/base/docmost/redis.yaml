@@ -1,0 +1,24 @@
+apiVersion: helm.toolkit.fluxcd.io/v2beta1
+kind: HelmRelease
+metadata:
+  name: docmost-redis
+  namespace: docmost
+spec:
+  interval: 30m
+  chart:
+    spec:
+      chart: redis
+      version: ">=23.2.5 <24.0.0"
+      sourceRef:
+        kind: HelmRepository
+        name: bitnami
+        namespace: flux-system
+      values:
+        auth:
+         existingSecret: docmost-postgres-credentials
+         existingSecretPasswordKey: password
+        replica:
+          replicaCount: 1
+        master:
+          persistence:
+            size: 2Gi

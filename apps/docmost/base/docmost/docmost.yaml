@@ -1,0 +1,82 @@
+---
+# Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: docmost
+  namespace: docmost
+  labels:
+    app: docmost
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: docmost
+  template:
+    metadata:
+      labels:
+        app: docmost
+    spec:
+      containers:
+        - name: docmost
+          image: docmost/docmost:latest
+          ports:
+            - containerPort: 3000
+              name: http
+          env:
+          - name: APP_URL
+            valueFrom:
+              secretKeyRef:
+                name: docmost-secret
+                key: app-url
+          - name: APP_SECRET
+            valueFrom:
+              secretKeyRef:
+                name: docmost-secret
+                key: app-secret
+          - name: DATABASE_URL
+            valueFrom:
+              secretKeyRef:
+                name: docmost-secret
+                key: database-url
+          - name: REDIS_URL
+            valueFrom:
+              secretKeyRef:
+                name: docmost-secret
+                key: redis-url
+---
+# Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: docmost
+  namespace: docmost
+  labels:
+    app: docmost
+spec:
+  type: ClusterIP
+  ports:
+    - port: 3000
+      targetPort: 3000
+      protocol: TCP
+      name: http
+  selector:
+    app: docmost
+---
+# IngressRoute (Traefik)
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: docmost
+  namespace: docmost
+spec:
+  entryPoints:
+    - web
+  routes:
+    - match: Host(`notes.gwynbliedd.com`)
+      kind: Rule
+      services:
+        - name: docmost
+          port: 3000
+---
+
