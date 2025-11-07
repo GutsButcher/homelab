@@ -13,11 +13,14 @@ spec:
         value: "worker-node"
         effect: "NoSchedule"
     
-    # Disable built-in PostgreSQL HA subchart - using CNPG instead
+    # Disable built-in PostgreSQL HA subchart - using standalone instead
     postgresql-ha:
       enabled: false
     postgresql:
-    enabled: false
+      enabled: false
+      primary:
+        persistence:
+          size: 3Gi
     # Disable built-in valkey-cluster subchart - using standalone redis
     valkey-cluster:
       enabled: false
@@ -32,30 +35,6 @@ spec:
           ROOT: "~/gitea-repositories"
         repository.pull-request:
           WORK_IN_PROGRESS_PREFIXES: "WIP:,[WIP]:"
-        database:
-          DB_TYPE: postgres
-          HOST: gitea-postgres-rw.gitea.svc.cluster.local:5432
-      additionalConfigFromEnvs:
-        - name: GITEA__DATABASE__NAME
-          valueFrom:
-            secretKeyRef:
-              name: gitea-postgres-credentials
-              key: database
-        - name: GITEA__DATABASE__USER
-          valueFrom:
-            secretKeyRef:
-              name: gitea-postgres-credentials
-              key: username
-        - name: GITEA__DATABASE__PASSWD
-          valueFrom:
-            secretKeyRef:
-              name: gitea-postgres-credentials
-              key: password
-        - name: GITEA__DATABASE__SCHEMA
-          valueFrom:
-            secretKeyRef:
-              name: gitea-postgres-credentials
-              key: schema
     persistence:
       enabled: true
       create: true
