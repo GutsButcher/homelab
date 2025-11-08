@@ -27,6 +27,9 @@ spec:
           ROOT: "~/gitea-repositories"
         repository.pull-request:
           WORK_IN_PROGRESS_PREFIXES: "WIP:,[WIP]:"
+      additionalConfigFromEnvs:
+        - name: GITEA__server__ROOT_URL
+          value: "https://gitea.gwynbliedd.com"
     persistence:
       enabled: true
       create: true
