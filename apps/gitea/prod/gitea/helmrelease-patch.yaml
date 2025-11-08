@@ -30,6 +30,10 @@ spec:
       additionalConfigFromEnvs:
         - name: GITEA__server__ROOT_URL
           value: "https://gitea.gwynbliedd.com"
+        - name: GITEA__server__DOMAIN
+          value: "gitea.gwynbliedd.com"
+        - name: GITEA__server__SSH_DOMAIN
+          value: "gitea.gwynbliedd.com"
     persistence:
       enabled: true
       create: true
