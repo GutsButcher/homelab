@@ -1,0 +1,19 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: rustfs
+  namespace: rustfs
+spec:
+  entryPoints:
+    - web
+  routes:
+    - match: Host(`s3.gwynbliedd.com`)
+      kind: Rule
+      services:
+        - name: rustfs
+          port: 9001
+    - match: Host(`s3-api.gwynbliedd.com`)
+      kind: Rule
+      services:
+        - name: rustfs
+          port: 9000
