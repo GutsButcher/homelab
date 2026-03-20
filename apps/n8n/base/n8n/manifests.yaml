@@ -53,6 +53,7 @@ spec:
       containers:
       - name: n8n
         image: docker.n8n.io/n8nio/n8n:latest
+        imagePullPolicy: Always
         ports:
         - containerPort: 5678
           name: http
