@@ -9,6 +9,16 @@ alertmanager:
 
 grafana:
   enabled: true
+  # Use a sealed secret instead of letting the subchart generate admin-password with
+  # randAlphaNum. Argo CD's repo-server renders without cluster access, so the chart's
+  # `lookup` of the existing Secret always came up empty and produced a new password on
+  # every render - permanently OutOfSync, and each sync would have rotated the Grafana
+  # admin password and restarted the pod via the checksum/secret annotation. With
+  # existingSecret set the chart renders neither the Secret nor that annotation.
+  admin:
+    existingSecret: grafana-admin
+    userKey: admin-user
+    passwordKey: admin-password
 
 nodeExporter:
   enabled: true

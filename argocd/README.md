@@ -75,11 +75,29 @@ them `selfHeal` would overwrite the injected CA on every pass.
 
 ## Two things Argo CD must not manage
 
-**Prometheus CRDs.** The `monitoring` Application sets `helm.skipCrds: true`. The CRDs in
-this cluster were installed out-of-band and come from prometheus-operator **v0.83.0**,
-while the running operator image and the bundled chart CRDs are **v0.65.1**. Letting Argo
-CD own them would mean continuously downgrading CRDs underneath live `Prometheus` and
-`ServiceMonitor` objects. CRD upgrades stay a manual step here.
+**Prometheus CRDs on a major chart bump.** Argo CD computes its diff using the CRD
+schema *already in the cluster*. When kube-prometheus-stack was moved from chart 45.31.1
+to 88.5.3, the rendered `Prometheus` CR used fields the live v0.83.0 CRD did not declare,
+so the app failed with:
+
+```
+ComparisonError: failed to calculate diff: error calculating structured merge diff:
+error building typed value from config resource: .spec.hostNetwork: field not declared
+```
+
+That is a deadlock — Argo CD will not sync (which would update the CRD) until it can
+diff, and it cannot diff until the CRD is updated. Apply the chart's CRDs by hand first,
+then let Argo CD take over:
+
+```bash
+helm pull kube-prometheus-stack --repo https://prometheus-community.github.io/helm-charts \
+  --version <new-version> --untar --untardir /tmp/kps
+kubectl apply --server-side --force-conflicts -f /tmp/kps/kube-prometheus-stack/charts/crds/crds/
+kubectl annotate application monitoring -n argocd argocd.argoproj.io/refresh=hard --overwrite
+```
+
+`--server-side` is required: these CRDs are up to 813 KB and blow past the client-side
+`last-applied-configuration` annotation limit. Expect to repeat this on the next major bump.
 
 **The gitea postgres password.** The bitnami postgresql subchart generates
 `Secret/gitea-postgresql` with `randAlphaNum`, and normally keeps it stable by `lookup`-ing
@@ -89,7 +107,16 @@ OutOfSync, and a sync would rotate the password out from under the running gitea
 `gitea` Application therefore carries an `ignoreDifferences` entry for that Secret's
 `/data`, which `RespectIgnoreDifferences=true` also honours during sync.
 
-Any other chart that generates its own credentials will need the same treatment.
+**Grafana's admin password** had the same problem and is solved properly rather than
+ignored: `grafana.admin.existingSecret` points at the `grafana-admin` SealedSecret in
+`apps/monitoring/prod/prometheus/`, which was sealed from the password already in the
+cluster. With `existingSecret` set the chart renders neither its own Secret nor the
+`checksum/secret` pod annotation derived from it, so the output is byte-stable across
+renders — verified by rendering twice and diffing.
+
+Any other chart that generates its own credentials will need one of these two treatments.
+Prefer the `existingSecret` + SealedSecret route: `ignoreDifferences` leaves the repo
+describing something other than what is running.
 
 ## Leftovers from Flux
 

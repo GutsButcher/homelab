@@ -48,18 +48,6 @@ spec:
         factor: 2
         maxDuration: 10m
   ignoreDifferences:
-    # The grafana subchart generates admin-password with randAlphaNum and keeps it
-    # stable by `lookup`-ing the existing Secret. Argo CD's repo-server renders without
-    # cluster access, so a different password is produced on every render - which would
-    # leave the app permanently OutOfSync and rotate the Grafana admin password out from
-    # under you on each sync. RespectIgnoreDifferences (above) also keeps it out of the
-    # applied payload, so the live Secret is left alone.
-    - group: ""
-      kind: Secret
-      name: kube-prometheus-stack-grafana
-      namespace: monitoring
-      jsonPointers:
-        - /data
     # caBundle is injected at runtime by the operator / admission patch job.
     - group: admissionregistration.k8s.io
       kind: ValidatingWebhookConfiguration
