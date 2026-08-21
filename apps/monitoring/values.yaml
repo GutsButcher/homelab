@@ -1,4 +1,9 @@
 # kube-prometheus-stack values (merged from the former base + prod Flux HelmRelease)
+#
+# Note: neither Grafana nor Prometheus has persistent storage here - both use emptyDir,
+# so dashboards/datasources come from the provisioning ConfigMaps and metrics history is
+# lost on pod restart. That predates the Argo CD migration; enable
+# grafana.persistence / prometheus.prometheusSpec.storageSpec if you want it to survive.
 alertmanager:
   enabled: true
 

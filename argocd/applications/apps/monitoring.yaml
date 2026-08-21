@@ -23,17 +23,15 @@ spec:
       path: apps/monitoring/prod/prometheus
     - repoURL: https://prometheus-community.github.io/helm-charts
       chart: kube-prometheus-stack
-      targetRevision: 45.31.1
+      targetRevision: 88.5.3
       helm:
         releaseName: kube-prometheus-stack
         valueFiles:
           - $values/apps/monitoring/values.yaml
-        # The prometheus-operator CRDs in this cluster were installed out-of-band and
-        # are from operator v0.83.0, while this chart bundles the v0.65-era CRDs that
-        # match the running operator image. Letting Argo CD manage them would mean
-        # continuously trying to downgrade CRDs underneath live Prometheus and
-        # ServiceMonitor objects. CRDs stay out-of-band; the chart only owns workloads.
-        skipCrds: true
+        # CRDs are managed again (skipCrds was needed only while this app was pinned to
+        # chart 45.x, whose v0.65-era CRDs were older than the v0.83.0 CRDs someone had
+        # applied out-of-band). Chart 88.5.3 ships operator v0.93.1 CRDs, so the chart is
+        # now ahead of the cluster and applying them is an upgrade, not a downgrade.
   syncPolicy:
     automated:
       prune: true
@@ -50,6 +48,18 @@ spec:
         factor: 2
         maxDuration: 10m
   ignoreDifferences:
+    # The grafana subchart generates admin-password with randAlphaNum and keeps it
+    # stable by `lookup`-ing the existing Secret. Argo CD's repo-server renders without
+    # cluster access, so a different password is produced on every render - which would
+    # leave the app permanently OutOfSync and rotate the Grafana admin password out from
+    # under you on each sync. RespectIgnoreDifferences (above) also keeps it out of the
+    # applied payload, so the live Secret is left alone.
+    - group: ""
+      kind: Secret
+      name: kube-prometheus-stack-grafana
+      namespace: monitoring
+      jsonPointers:
+        - /data
     # caBundle is injected at runtime by the operator / admission patch job.
     - group: admissionregistration.k8s.io
       kind: ValidatingWebhookConfiguration
