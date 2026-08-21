@@ -65,6 +65,7 @@ principles for continuous deployment and infrastructure management.
 | Monitoring (Prometheus + Grafana) | `grafana.gwynbliedd.com` | Helm `kube-prometheus-stack` |
 | n8n | `n8n.gwynbliedd.com` | manifests |
 | pgAdmin | `pgadmin.gwynbliedd.com` | Helm `pgadmin4` |
+| RustFS (S3) | `s3.gwynbliedd.com`, `s3-api.gwynbliedd.com` | manifests |
 | Vaultwarden | `vaultwarden.gwynbliedd.com` | Helm `vaultwarden` |
 | Wallabag | `wallabag.gwynbliedd.com` | manifests |
 

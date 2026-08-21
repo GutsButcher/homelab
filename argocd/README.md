@@ -45,8 +45,8 @@ no equivalent CR, so each Helm-backed app is a **multi-source Application**:
 The values that used to sit under `spec.values` of the HelmRelease now live in a plain
 `values.yaml` next to the app (`apps/<app>/values.yaml`, `infrastructure/<component>/values.yaml`).
 
-Apps with no Helm chart (kavita, n8n, wallabag) are single-source Applications pointing at
-their Kustomize directory.
+Apps with no Helm chart (kavita, n8n, rustfs, wallabag) are single-source Applications
+pointing at their Kustomize directory.
 
 ## Chart versions are pinned
 
