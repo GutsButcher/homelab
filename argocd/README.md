@@ -73,6 +73,24 @@ kube-prometheus-stack ship CRDs too large for the client-side
 cainjector and the CNPG / prometheus-operator admission jobs write at runtime. Without
 them `selfHeal` would overwrite the injected CA on every pass.
 
+## Two things Argo CD must not manage
+
+**Prometheus CRDs.** The `monitoring` Application sets `helm.skipCrds: true`. The CRDs in
+this cluster were installed out-of-band and come from prometheus-operator **v0.83.0**,
+while the running operator image and the bundled chart CRDs are **v0.65.1**. Letting Argo
+CD own them would mean continuously downgrading CRDs underneath live `Prometheus` and
+`ServiceMonitor` objects. CRD upgrades stay a manual step here.
+
+**The gitea postgres password.** The bitnami postgresql subchart generates
+`Secret/gitea-postgresql` with `randAlphaNum`, and normally keeps it stable by `lookup`-ing
+the Secret that already exists. Argo CD's repo-server renders without cluster access, so
+`lookup` returns nothing and a *new* password appears on every render — permanently
+OutOfSync, and a sync would rotate the password out from under the running gitea. The
+`gitea` Application therefore carries an `ignoreDifferences` entry for that Secret's
+`/data`, which `RespectIgnoreDifferences=true` also honours during sync.
+
+Any other chart that generates its own credentials will need the same treatment.
+
 ## Leftovers from Flux
 
 The old `sh.helm.release.v1.*` secrets are still in the cluster. Argo CD does not use them

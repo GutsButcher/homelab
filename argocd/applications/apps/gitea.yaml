@@ -43,3 +43,16 @@ spec:
         duration: 30s
         factor: 2
         maxDuration: 10m
+  ignoreDifferences:
+    # The bitnami postgresql subchart generates this password with randAlphaNum and
+    # normally keeps it stable by `lookup`-ing the existing Secret. Argo CD's repo-server
+    # renders without cluster access, so lookup returns nothing and a fresh password is
+    # produced on every render - permanently OutOfSync, and a sync would rotate the
+    # password out from under the running gitea. Combined with RespectIgnoreDifferences
+    # above, this leaves the live Secret alone.
+    - group: ""
+      kind: Secret
+      name: gitea-postgresql
+      namespace: gitea
+      jsonPointers:
+        - /data

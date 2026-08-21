@@ -28,6 +28,12 @@ spec:
         releaseName: kube-prometheus-stack
         valueFiles:
           - $values/apps/monitoring/values.yaml
+        # The prometheus-operator CRDs in this cluster were installed out-of-band and
+        # are from operator v0.83.0, while this chart bundles the v0.65-era CRDs that
+        # match the running operator image. Letting Argo CD manage them would mean
+        # continuously trying to downgrade CRDs underneath live Prometheus and
+        # ServiceMonitor objects. CRDs stay out-of-band; the chart only owns workloads.
+        skipCrds: true
   syncPolicy:
     automated:
       prune: true
