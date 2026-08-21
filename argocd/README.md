@@ -120,14 +120,26 @@ describing something other than what is running.
 
 ## Leftovers from Flux
 
-The old `sh.helm.release.v1.*` secrets are still in the cluster. Argo CD does not use them
-and they are harmless, but they make `helm list` show releases nothing manages any more.
-Once you are happy the migration has settled, they can be removed:
+Swept on 2026-08-21:
+
+- The `sh.helm.release.v1.*` secrets from the Flux era were deleted. Argo CD does not use
+  them; they only made `helm list` show releases nothing manages any more. **The
+  `kube-system` `traefik` and `traefik-crd` releases are not Flux leftovers** — k3s owns
+  those through its own `HelmChart` CRs and its helm-controller needs them.
+- A dead `prometheus-stack` release (a kube-prometheus-stack install predating the current
+  one) still had 4 ClusterRoles, 4 ClusterRoleBindings, 6 `kube-system` Services and a
+  pair of admission webhooks pointing at a Service that no longer existed. All removed.
+
+Still outstanding: many live objects carry `kustomize.toolkit.fluxcd.io/*` and
+`helm.toolkit.fluxcd.io/*` labels. These do **not** disappear on their own — Argo CD
+applies server-side, and server-side apply only removes fields its own field manager owns.
+Flux set those labels under a different manager, so they persist until stripped by hand:
 
 ```bash
-kubectl get secret -A -l owner=helm
-# kubectl delete secret -n <ns> -l owner=helm,name=<release>
+kubectl label <resource> <name> -n <ns> \
+  kustomize.toolkit.fluxcd.io/name- kustomize.toolkit.fluxcd.io/namespace- \
+  helm.toolkit.fluxcd.io/name- helm.toolkit.fluxcd.io/namespace-
 ```
 
-Likewise, the `helm.toolkit.fluxcd.io/name` and `kustomize.toolkit.fluxcd.io/name` labels
-on live objects are dropped the first time Argo CD applies each resource.
+They are cosmetic — nothing selects on them — but they make the cluster look like Flux is
+still involved.
