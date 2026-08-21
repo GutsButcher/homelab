@@ -18,9 +18,6 @@ spec:
       targetRevision: main
       path: apps/rustfs
   syncPolicy:
-    automated:
-      prune: true
-      selfHeal: true
     syncOptions:
       # Apply server-side: several charts here ship CRDs too large for the
       # client-side last-applied-configuration annotation.
