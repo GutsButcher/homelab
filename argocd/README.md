@@ -123,9 +123,26 @@ describing something other than what is running.
 Swept on 2026-08-21:
 
 - The `sh.helm.release.v1.*` secrets from the Flux era were deleted. Argo CD does not use
-  them; they only made `helm list` show releases nothing manages any more. **The
-  `kube-system` `traefik` and `traefik-crd` releases are not Flux leftovers** — k3s owns
-  those through its own `HelmChart` CRs and its helm-controller needs them.
+  them; they only made `helm list` show releases nothing manages any more.
+
+  **Do not sweep the `kube-system` `traefik` and `traefik-crd` releases with them** — they
+  are not Flux leftovers. k3s owns Traefik through its own `HelmChart` CRs and its
+  helm-controller needs that release history. They were deleted by accident during this
+  sweep (a filter written for `namespace/name` against `kubectl --no-headers`, which
+  prints space-separated columns, so the exclusion silently matched nothing) and had to be
+  rebuilt by adopting the live objects:
+
+  ```bash
+  kubectl get --raw /static/charts/traefik-34.2.1+up34.2.0.tgz > traefik.tgz
+  kubectl get helmchart traefik -n kube-system -o jsonpath='{.spec.valuesContent}' > traefik-values.yaml
+  helm upgrade --install traefik ./traefik.tgz -n kube-system --take-ownership \
+    --set-string global.systemDefaultRegistry= -f traefik-values.yaml
+  ```
+
+  `--take-ownership` (Helm 3.17+) adopts the running objects instead of failing on
+  "already exists". This was a no-op apply — the Traefik pod was not restarted. Note that
+  the k3s install Job runs with `FAILURE_POLICY=reinstall`, so a *failed* run of it would
+  uninstall and reinstall Traefik, taking ingress down with it.
 - A dead `prometheus-stack` release (a kube-prometheus-stack install predating the current
   one) still had 4 ClusterRoles, 4 ClusterRoleBindings, 6 `kube-system` Services and a
   pair of admission webhooks pointing at a Service that no longer existed. All removed.
