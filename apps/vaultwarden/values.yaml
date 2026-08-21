@@ -16,7 +16,7 @@ ingress:
         - vaultwarden.gwynbliedd.com
 
 image:
-  tag: "1.34.3-alpine"
+  tag: "1.37.1-alpine"
 service:
     extraPorts:
       - name: websocket
