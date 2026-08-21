@@ -1,0 +1,45 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: homepage
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: homelab
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: homepage
+  sources:
+    # Git repo referenced only so the Helm source below can read $values/.
+    - repoURL: https://github.com/GutsButcher/homelab.git
+      targetRevision: main
+      ref: values
+    # Namespace, secrets and Traefik routes that live alongside the chart.
+    - repoURL: https://github.com/GutsButcher/homelab.git
+      targetRevision: main
+      path: apps/homepage/prod/homepage
+    - repoURL: https://jameswynn.github.io/helm-charts
+      chart: homepage
+      targetRevision: 2.1.0
+      helm:
+        releaseName: homepage
+        valueFiles:
+          - $values/apps/homepage/values.yaml
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      # Apply server-side: several charts here ship CRDs too large for the
+      # client-side last-applied-configuration annotation.
+      - ServerSideApply=true
+      - RespectIgnoreDifferences=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 30s
+        factor: 2
+        maxDuration: 10m

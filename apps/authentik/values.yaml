@@ -1,0 +1,26 @@
+global:
+    env:
+        - name: AUTHENTIK_HOST
+          value: "https://auth.gwynbliedd.com"
+        - name: AUTHENTIK_HOST_BROWSER
+          value: "https://auth.gwynbliedd.com"
+    envFrom:
+        - secretRef:
+              name: authentik-secrets
+
+authentik:
+    error_reporting:
+        enabled: true
+    postgresql:
+        host: authentik-postgres-rw.authentik.svc.cluster.local
+        name: authentik
+        user: authentik
+server:
+    ingress:
+        # Specify kubernetes ingress controller class name
+        ingressClassName: traefik
+        enabled: true
+        hosts:
+            - auth.gwynbliedd.com
+redis:
+    enabled: true

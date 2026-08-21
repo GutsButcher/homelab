@@ -1,0 +1,22 @@
+fullnameOverride: sealed-secrets-controller
+controller:
+  create: true
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      memory: 256Mi
+serviceAccount:
+  create: true
+  name: sealed-secrets-controller
+rbac:
+  create: true
+  pspEnabled: false
+secretName: sealed-secrets-key
+updateStatus: true
+metrics:
+  serviceMonitor:
+    enabled: false
+networkPolicy:
+  enabled: false

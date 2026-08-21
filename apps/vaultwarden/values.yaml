@@ -1,0 +1,65 @@
+# Workload kind must stay Deployment: the live release runs a Deployment, and the
+# chart's default flipped to StatefulSet. Leaving this unset would make Argo CD
+# create a second workload alongside the existing one on the same PVC.
+kind: Deployment
+
+# The chart derives DOMAIN from `vaultwarden.domain`, but hardcodes the scheme to
+# http:// unless ingress.tls is non-empty (see templates/_ingress.tpl). DOMAIN is
+# what /api/config advertises to clients, so an http:// value makes the bw CLI and
+# the browser extension follow plain-http endpoints and fail. Routing is handled by
+# the Traefik IngressRoute, so the Ingress object itself stays disabled - this block
+# exists only to force the https scheme.
+ingress:
+  enabled: false
+  tls:
+    - hosts:
+        - vaultwarden.gwynbliedd.com
+
+image:
+  tag: "1.34.3-alpine"
+service:
+    extraPorts:
+      - name: websocket
+        port: 3012
+        targetPort: 3012
+vaultwarden:
+  domain: "vaultwarden.gwynbliedd.com"
+  adminToken:
+    existingSecret:
+      name: admin-token
+      key: token
+  data:
+    pvc:
+      storageClass: local-path
+
+
+  passwords:
+    iterations: 350000  # KDF iterations - required for mobile app
+    hintsAllowed: true
+    showHint: true
+  database:
+    type: postgresql
+    existingSecret:
+      name: db-secret
+      key: uri
+  # Restrict signups - only admin can invite
+  signup:
+    allowed: false      # Disable public registration
+    verify: true        # Email verification for invites
+  invitations:
+    allowed: true       # Admin can invite users
+    orgName: "Gwynbliedd Vault"
+    expirationHours: 48
+  # Gmail SMTP Configuration
+  email:
+    smtp:
+      host: "smtp.gmail.com"
+      from: "abdulla.amash@gmail.com"
+      fromName: "Gwynbliedd Vault"
+      security: "force_tls"
+      port: 465
+      username: "abdulla.amash@gmail.com"
+      auth: "Login"
+      existingSecret:
+        name: "vaultwarden-smtp"
+      requireDeviceEmail: true  # Email on new device login 

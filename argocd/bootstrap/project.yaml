@@ -1,0 +1,34 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: homelab
+  namespace: argocd
+spec:
+  description: Everything deployed to the gwynbliedd homelab cluster
+
+  # Git repo holding the manifests, plus every upstream Helm chart repo we pull from.
+  sourceRepos:
+    - https://github.com/GutsButcher/homelab.git
+    - https://charts.jetstack.io
+    - https://cloudnative-pg.github.io/charts
+    - https://bitnami.github.io/sealed-secrets
+    - https://metallb.github.io/metallb
+    - https://charts.goauthentik.io
+    - https://dl.gitea.com/charts
+    - https://jameswynn.github.io/helm-charts
+    - https://rubxkube.github.io/charts
+    - https://helm.runix.net
+    - https://prometheus-community.github.io/helm-charts
+    - https://adnoctem.github.io/helm
+
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: '*'
+
+  # Single-tenant homelab: apps legitimately install CRDs, ClusterRoles and webhooks.
+  clusterResourceWhitelist:
+    - group: '*'
+      kind: '*'
+  namespaceResourceWhitelist:
+    - group: '*'
+      kind: '*'

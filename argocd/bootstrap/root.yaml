@@ -1,0 +1,30 @@
+# App-of-apps root. Apply this once and Argo CD picks up every Application under
+# argocd/applications/ and keeps that set in sync with git:
+#
+#   kubectl apply -f argocd/bootstrap/project.yaml
+#   kubectl apply -f argocd/bootstrap/root.yaml
+#
+# Deliberately has no resources-finalizer: deleting the root must not cascade into
+# deleting every application in the cluster.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: root
+  namespace: argocd
+spec:
+  project: homelab
+  source:
+    repoURL: https://github.com/GutsButcher/homelab.git
+    targetRevision: main
+    path: argocd/applications
+    directory:
+      recurse: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - ServerSideApply=true

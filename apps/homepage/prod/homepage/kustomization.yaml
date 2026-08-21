@@ -5,7 +5,3 @@ resources:
   - authentik-middleware.yaml
   - ingressroute.yaml
   - pvc-icons.yaml
-
-patchesStrategicMerge:
-  - helmrelease-patch.yaml
-

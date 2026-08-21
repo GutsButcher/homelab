@@ -143,8 +143,9 @@ git add .
 git commit -m "Add Authentik protection to <service>"
 git push
 
-# Force Flux reconciliation
-flux reconcile kustomization apps --with-source
+# Force Argo CD reconciliation
+kubectl annotate application <service> -n argocd \
+  argocd.argoproj.io/refresh=hard --overwrite
 
 # Or apply directly
 kubectl apply -k apps/<service>/prod/

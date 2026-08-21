@@ -3,7 +3,3 @@ kind: Kustomization
 resources:
   - ../../base
   - authentik-secret.yaml
-
-patchesStrategicMerge:
-  - helmrelease-patch.yaml
-

@@ -1,0 +1,39 @@
+# Disable built-in PostgreSQL HA subchart - using standalone instead
+postgresql-ha:
+  enabled: false
+postgresql:
+  enabled: true
+  primary:
+    persistence:
+      size: 3Gi
+# Disable built-in valkey-cluster subchart - using standalone redis
+valkey-cluster:
+  enabled: false
+valkey:
+  enabled: true
+gitea:
+  admin:
+    existingSecret: gitea-admin-secret
+  config:
+    APP_NAME: "Gitea: With a cup of tea."
+    repository:
+      ROOT: "~/gitea-repositories"
+    repository.pull-request:
+      WORK_IN_PROGRESS_PREFIXES: "WIP:,[WIP]:"
+  additionalConfigFromEnvs:
+    - name: GITEA__server__ROOT_URL
+      value: "https://gitea.gwynbliedd.com"
+    - name: GITEA__server__DOMAIN
+      value: "gitea.gwynbliedd.com"
+    - name: GITEA__server__SSH_DOMAIN
+      value: "gitea.gwynbliedd.com"
+    - name: GITEA__service__DISABLE_REGISTRATION
+      value: "true"
+persistence:
+  enabled: true
+  create: true
+  mount: true
+  size: 10Gi
+  storageClass: local-path
+  accessModes:
+    - ReadWriteOnce

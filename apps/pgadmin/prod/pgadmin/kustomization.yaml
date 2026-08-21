@@ -4,6 +4,3 @@ resources:
   - ../../base
   - pgadmin-secret.yaml
   - ingressroute.yaml
-
-patchesStrategicMerge:
-  - helmrelease-patch.yaml

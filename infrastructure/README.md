@@ -16,8 +16,10 @@ A load balancer implementation for bare metal Kubernetes clusters, providing net
 ### Sealed Secrets
 Enables secure storage of secrets in Git by encrypting them with a public key. Only the cluster can decrypt these secrets.
 
-### Sources
-Helm repository definitions used by FluxCD to pull charts. Each source file defines a repository that can be referenced by HelmReleases.
+### Chart sources
+There is no `sources/` directory any more. Argo CD Applications carry the chart repository
+URL inline (`spec.sources[].repoURL`), and every allowed URL is listed in `sourceRepos`
+in `argocd/bootstrap/project.yaml`.
 
 ## Deployment Order
 
@@ -45,9 +47,9 @@ kubectl get pods -n metallb-system
 kubectl get pods -n sealed-secrets
 kubectl get pods -n cnpg-system
 
-# View HelmRelease status
-flux get helmreleases -n infrastructure
+# View Application status
+kubectl get applications -n argocd
 
 # Check for issues
-kubectl describe helmrelease <name> -n infrastructure
+kubectl describe application <name> -n argocd
 ```

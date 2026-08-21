@@ -1,34 +1,40 @@
 # Homelab GitOps Repository
 
-This repository contains the complete infrastructure and application configurations for my personal Kubernetes homelab, managed through GitOps with FluxCD.
+This repository contains the complete infrastructure and application configurations for my personal Kubernetes homelab, managed through GitOps with Argo CD.
 
 ## Overview
 
-A self-hosted Kubernetes cluster running various applications at gwynbliedd.com, using GitOps principles for continuous deployment and infrastructure management.
+A self-hosted k3s cluster running various applications at gwynbliedd.com, using GitOps
+principles for continuous deployment and infrastructure management.
+
+> **Migrated off FluxCD.** Flux is no longer installed; Argo CD reconciles everything
+> from `main`. See [argocd/README.md](./argocd/README.md) for how the pieces fit together.
 
 ## Technology Stack
 
 - **Kubernetes**: Container orchestration platform
-- **FluxCD**: GitOps continuous delivery solution
+- **Argo CD**: GitOps continuous delivery solution
 - **Kustomize**: Kubernetes native configuration management
 - **Helm**: Kubernetes package manager
 - **Traefik**: Modern reverse proxy and ingress controller
 - **CloudNative PG**: PostgreSQL operator for Kubernetes
 - **Sealed Secrets**: Encrypted secrets management
-- **MetalLB**: Bare metal load balancer
+- **MetalLB**: Bare metal load balancer *(declared but currently not installed — see `argocd/parked/`)*
 - **cert-manager**: Automatic TLS certificate management
 
 ## Repository Structure
 
 ```
 .
-├── clusters/
-│   └── homelab/         # FluxCD cluster configuration
-├── infrastructure/       # Core infrastructure components
-│   ├── sources/         # Helm repository definitions
-│   └── [components]/    # Infrastructure applications
+├── argocd/
+│   ├── bootstrap/       # AppProject + root app-of-apps (applied once, by hand)
+│   ├── applications/    # One Argo CD Application per deployed component
+│   └── parked/          # Applications deliberately not synced
+├── infrastructure/      # Core infrastructure components
+│   └── [component]/     # Namespace, values.yaml, extra manifests
 ├── apps/                # Application deployments
-│   └── [app-name]/      # Individual application configurations
+│   └── [app-name]/
+│       ├── values.yaml  # Helm values (was HelmRelease spec.values under Flux)
 │       ├── base/        # Base configurations
 │       └── prod/        # Production overlays
 └── scripts/             # Utility scripts
@@ -36,83 +42,70 @@ A self-hosted Kubernetes cluster running various applications at gwynbliedd.com,
 
 ### Documentation
 
-- [Clusters Configuration](./clusters/README.md) - FluxCD setup and bootstrapping
+- [Argo CD Configuration](./argocd/README.md) - GitOps setup and bootstrapping
 - [Infrastructure Components](./infrastructure/README.md) - Core services documentation
 - [Applications](./apps/README.md) - Deployed applications overview
 - [Scripts](./scripts/README.md) - Utility scripts and automation tools
 
 ## Deployed Applications
 
-### Infrastructure Components
-- **[cert-manager](./infrastructure/cert-manager/README.md)**: Automated TLS certificate management
-- **[CloudNative PG](./infrastructure/cnpg/README.md)**: PostgreSQL database operator
-- **[MetalLB](./infrastructure/metallb/README.md)**: Load balancer for bare metal Kubernetes
-- **[Sealed Secrets](./infrastructure/sealed-secrets/README.md)**: Secure secret management
-- **[Traefik](./apps/traefik/README.md)**: Ingress controller and reverse proxy
+### Infrastructure (Argo CD sync-wave -2)
+- **[cert-manager](./infrastructure/cert-manager/README.md)** — TLS certificate management
+- **[CloudNative PG](./infrastructure/cnpg/README.md)** — PostgreSQL operator
+- **[Sealed Secrets](./infrastructure/sealed-secrets/README.md)** — encrypted secrets in git
 
-### Applications
+### Applications (sync-wave 0)
+| App | URL | Source |
+| --- | --- | --- |
+| Authentik | `auth.gwynbliedd.com` | Helm `authentik` |
+| Gitea | `gitea.gwynbliedd.com` | Helm `gitea` |
+| Homepage | `home.gwynbliedd.com` | Helm `homepage` |
+| Kavita | `books.gwynbliedd.com` | manifests |
+| Linkding | `linkding.gwynbliedd.com` | Helm `linkding` |
+| Monitoring (Prometheus + Grafana) | `grafana.gwynbliedd.com` | Helm `kube-prometheus-stack` |
+| n8n | `n8n.gwynbliedd.com` | manifests |
+| pgAdmin | `pgadmin.gwynbliedd.com` | Helm `pgadmin4` |
+| Vaultwarden | `vaultwarden.gwynbliedd.com` | Helm `vaultwarden` |
+| Wallabag | `wallabag.gwynbliedd.com` | manifests |
 
-#### Media & Entertainment
-- **[Jellyfin](./apps/jellyfin/README.md)**: Media server for movies, TV shows, and music
-- **[Jellyseerr](./apps/jellyseerr/README.md)**: Media request management for Jellyfin
-- **[Prowlarr](./apps/prowlarr/README.md)**: Indexer manager for media automation
-- **[Radarr](./apps/radarr/README.md)**: Movie collection manager
-- **[Sonarr](./apps/sonarr/README.md)**: TV series collection manager
-- **[qBittorrent](./apps/qbittorrent/README.md)**: BitTorrent client
-
-#### Productivity & Tools
-- **[Homepage](./apps/homepage/README.md)**: Personal dashboard and service catalog
-- **[IT-Tools](./apps/it-tools/README.md)**: Collection of handy IT utilities
-- **[n8n](./apps/n8n/README.md)**: Workflow automation platform ([Migration Plan](./apps/n8n/CLAUDE.md))
-- **[Obsidian LiveSync](./apps/obsidian/README.md)**: Self-hosted Obsidian synchronization
-- **[Wallabag](./apps/wallabag/README.md)**: Read-it-later application ([Migration Plan](./apps/wallabag/CLAUDE.md))
-
-#### Monitoring & Management
-- **[Dozzle](./apps/dozzle/README.md)**: Real-time Docker log viewer
-- **[Glances](./apps/glances/README.md)**: System monitoring dashboard
-- **[Monitoring Stack](./apps/monitoring/README.md)**: Prometheus-based monitoring
-
-#### Development & Gaming
-- **[Gwent Game](./apps/gwent-game/README.md)**: Web-based card game
-- **[Jenkins](./apps/jenkins/README.md)**: CI/CD automation server
-- **[Linkding](./apps/linkding/README.md)**: Bookmark manager
-- **[PgAdmin](./apps/pgadmin/README.md)**: PostgreSQL management tool
-- **[VS Code Server](./apps/vscode/README.md)**: Web-based code editor (not deployed)
+### Not deployed
+- **MetalLB**, **traefik-metallb Service**, **IT-Tools**, **Syncthing** — parked, see
+  [argocd/parked/README.md](./argocd/parked/README.md)
+- **Docmost**, **`apps/old-apps/*`** (Jenkins, Pi-hole, Nextcloud, Gwent) — manifests kept
+  for reference only; they still contain Flux CRs that nothing can act on
 
 ## Getting Started
 
 ### Prerequisites
 - Kubernetes cluster (1.28+)
-- FluxCD CLI installed
+- Argo CD installed in the `argocd` namespace
 - kubectl configured with cluster access
 
 ### Cluster Bootstrap
 
-1. Fork this repository
-2. Update cluster configuration in `clusters/homelab/`
-3. Bootstrap FluxCD:
-   ```bash
-   flux bootstrap github \
-     --owner=<your-username> \
-     --repository=<your-repo> \
-     --branch=main \
-     --path=./clusters/homelab
-   ```
+Argo CD is installed manually and is not self-managed. Once it is running, hand it the
+cluster with two applies:
+
+```bash
+kubectl apply -f argocd/bootstrap/project.yaml
+kubectl apply -f argocd/bootstrap/root.yaml
+```
+
+The `root` Application recursively watches `argocd/applications/`, so every component
+below is created from there. This repository is public, so no Argo CD repository
+credentials are needed.
 
 ### Verifying Deployment
 
 ```bash
-# Check FluxCD components
-flux check
+# Application status
+kubectl get applications -n argocd
 
-# View all FluxCD resources
-flux get all
+# Why is something OutOfSync / Degraded
+kubectl describe application <name> -n argocd
+kubectl logs -n argocd deploy/argocd-repo-server     # render errors
 
-# Monitor reconciliation
-flux logs --follow
-
-# Check application status
-kubectl get helmreleases -A
+# Workload status
 kubectl get pods -A
 ```
 
@@ -141,9 +134,11 @@ For detailed instructions and examples, see the [Sealed Secrets documentation](.
 ## GitOps Workflow
 
 1. All changes are made through Git commits
-2. FluxCD automatically syncs from the main branch every minute
-3. Kustomize patches are applied for environment-specific configurations
-4. Helm releases are managed declaratively through HelmRelease resources
+2. Argo CD automatically syncs from the `main` branch (`prune` + `selfHeal` enabled)
+3. Kustomize overlays cover Namespaces, SealedSecrets, CNPG clusters and Traefik routes
+4. Helm charts are pulled directly by multi-source Argo CD `Application` resources, with
+   values read from `apps/<app>/values.yaml`
+5. Chart versions are pinned exactly — bump `targetRevision` to upgrade
 
 ## Contributing
 
@@ -157,11 +152,11 @@ This project is open source and available under the [MIT License](LICENSE).
 
 ### Internal Documentation
 - [CLAUDE.md](./CLAUDE.md) - AI assistant guidelines and codebase overview
+- [Argo CD setup](./argocd/README.md) - Control plane layout and migration notes
 - [Script Ideas](./scripts/CLAUDE.md) - Future automation plans
-- [Infrastructure Sources](./infrastructure/sources/) - Helm repository configurations
 
 ### External Links
-- [FluxCD Documentation](https://fluxcd.io/)
+- [Argo CD Documentation](https://argo-cd.readthedocs.io/)
 - [Kubernetes Documentation](https://kubernetes.io/docs/)
 - [Helm Documentation](https://helm.sh/docs/)
 - [Kustomize Documentation](https://kustomize.io/)

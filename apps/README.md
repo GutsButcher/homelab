@@ -81,9 +81,11 @@ kubectl get pods -n <app-name>
 # View application logs
 kubectl logs -n <app-name> <pod-name>
 
-# Check HelmRelease status
-flux get helmrelease <app-name> -n <app-name>
+# Check Argo CD Application status
+kubectl get application <app-name> -n argocd
+kubectl describe application <app-name> -n argocd
 
 # Force reconciliation
-flux reconcile helmrelease <app-name> -n <app-name>
+kubectl annotate application <app-name> -n argocd \
+  argocd.argoproj.io/refresh=hard --overwrite
 ```

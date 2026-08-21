@@ -1,0 +1,12 @@
+# kube-prometheus-stack values (merged from the former base + prod Flux HelmRelease)
+alertmanager:
+  enabled: true
+
+grafana:
+  enabled: true
+
+nodeExporter:
+  enabled: true
+
+kubeStateMetrics:
+  enabled: true

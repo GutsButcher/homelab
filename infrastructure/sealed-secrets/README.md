@@ -4,7 +4,7 @@ Sealed Secrets provides a way to encrypt secrets that can be stored in Git repos
 
 ## Installation
 
-The sealed-secrets controller is deployed automatically via FluxCD when changes are pushed to the main branch.
+The sealed-secrets controller is deployed automatically by Argo CD when changes are pushed to the main branch.
 
 ## Usage
 

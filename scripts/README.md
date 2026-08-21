@@ -5,7 +5,7 @@ This directory is reserved for utility scripts and automation tools to enhance h
 ## Overview
 
 The scripts directory will contain:
-- FluxCD management utilities
+- Argo CD management utilities
 - Secret management tools
 - Application deployment helpers
 - Backup and restore scripts
@@ -18,9 +18,9 @@ The directory is currently empty but has comprehensive plans documented in `CLAU
 
 ## Planned Script Categories
 
-### 1. **Flux Management**
+### 1. **Argo CD Management**
 - Health checks and status monitoring
-- Bulk suspend/resume operations
+- Bulk sync/refresh operations
 - Reconciliation management
 
 ### 2. **Secret Management**
@@ -88,4 +88,4 @@ When adding scripts:
 
 - [CLAUDE.md](./CLAUDE.md) - Detailed script ideas and implementation plans
 - [Main README](../README.md) - Repository overview
-- [FluxCD Documentation](https://fluxcd.io/flux/) - For Flux-related scripts
+- [Argo CD Documentation](https://argo-cd.readthedocs.io/) - For Argo CD-related scripts
