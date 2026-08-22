@@ -1,0 +1,44 @@
+# LGTM + Alloy + OpenTelemetry zero-code observability stack.
+#
+# This is an app-of-apps: it owns nothing itself, it just points at the
+# gitops/applications/ directory of the (private) lgtm-alloy repo, which holds one
+# Argo CD Application per component with its own sync-wave.
+#
+# The lgtm-alloy repo is private, so Argo CD needs a credential for it. A read-only
+# SSH deploy key is registered as Secret/lgtm-alloy-repo in the argocd namespace —
+# applied by hand, the same way Argo CD itself is bootstrapped. Recreate it with:
+#
+#   kubectl create secret generic lgtm-alloy-repo -n argocd \
+#     --from-literal=type=git \
+#     --from-literal=url=git@github.com:GutsButcher/lgtm-alloy.git \
+#     --from-file=sshPrivateKey=<path to deploy key> \
+#     --dry-run=client -o yaml \
+#   | kubectl label --local -f - argocd.argoproj.io/secret-type=repository -o yaml --dry-run=client \
+#   | kubectl apply -f -
+#
+# This replaces the `monitoring` Application (kube-prometheus-stack), which was
+# removed when this went in.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: lgtm-alloy
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: homelab
+  source:
+    repoURL: git@github.com:GutsButcher/lgtm-alloy.git
+    targetRevision: main
+    path: gitops/applications
+    directory:
+      recurse: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - ServerSideApply=true
