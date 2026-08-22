@@ -21,6 +21,17 @@ spec:
     - https://prometheus-community.github.io/helm-charts
     - https://adnoctem.github.io/helm
 
+    # LGTM + Alloy zero-code observability stack (private repo; Argo CD reads it with
+    # the read-only deploy key in Secret/lgtm-alloy-repo).
+    - git@github.com:GutsButcher/lgtm-alloy.git
+    - https://grafana.github.io/helm-charts
+    # Grafana moved the OSS Grafana, Loki and Tempo charts out of grafana/helm-charts
+    # during 2026. This is the successor repo named in their own chart READMEs, not a
+    # third-party fork.
+    - https://grafana-community.github.io/helm-charts
+    - https://charts.min.io/
+    - https://open-telemetry.github.io/opentelemetry-helm-charts
+
   destinations:
     - server: https://kubernetes.default.svc
       namespace: '*'
