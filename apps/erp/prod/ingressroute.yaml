@@ -1,0 +1,31 @@
+# IngressRoute for erp.gwynbliedd.com
+#
+# Matches the homelab's existing pattern exactly: entryPoint `web`, no TLS
+# block. TLS is terminated at Cloudflare in front of the cluster, so asking
+# Traefik for a certResolver here would either fail or issue a second,
+# unnecessary certificate. Checked against apps/n8n and the other prod
+# overlays rather than assumed.
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: erp
+  namespace: erp
+spec:
+  entryPoints:
+    - web
+  routes:
+    # The realtime route is declared FIRST because Traefik evaluates rules in
+    # order and this one is the more specific match. Behind the generic host
+    # rule it would never be reached, and desk notifications would silently
+    # never arrive — a failure that looks like "notifications don't work"
+    # rather than a routing mistake.
+    - match: Host(`erp.gwynbliedd.com`) && PathPrefix(`/socket.io`)
+      kind: Rule
+      services:
+        - name: erp
+          port: 9000
+    - match: Host(`erp.gwynbliedd.com`)
+      kind: Rule
+      services:
+        - name: erp
+          port: 8000

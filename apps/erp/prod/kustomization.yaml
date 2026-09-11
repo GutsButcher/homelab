@@ -1,0 +1,27 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: erp
+
+resources:
+  - ../base
+  - ingressroute.yaml
+
+# The site name ERPNext serves. It must match the site directory inside the
+# sites volume, or frappe answers every request with "Site not found" — which
+# reads as a routing fault and is not one.
+configMapGenerator:
+  - name: erp-config
+    behavior: merge
+    literals:
+      - FRAPPE_SITE_NAME_HEADER=erp.gwynbliedd.com
+
+generatorOptions:
+  disableNameSuffixHash: true
+
+images:
+  # Written by the erp repo's CI on every push to main
+  # (scripts/update_image_tag.py). This single line is the handoff between the
+  # build pipeline and ArgoCD — not edited by hand.
+  - name: gwynbliedd/erpnext-van-sales
+    newTag: latest

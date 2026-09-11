@@ -1,0 +1,49 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: erp
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: homelab
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: erp
+  sources:
+    # ERPNext v16 with the van_sales and fleet apps. The image tag in
+    # apps/erp/prod/kustomization.yaml is rewritten by the erp repository's CI
+    # on every push to main; this Application is what turns that commit into a
+    # rollout.
+    - repoURL: https://github.com/GutsButcher/homelab.git
+      targetRevision: main
+      path: apps/erp/prod
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - ServerSideApply=true
+      - RespectIgnoreDifferences=true
+      # The namespace is in the manifests, but ordering during a first sync is
+      # not guaranteed without this.
+      - CreateNamespace=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 30s
+        factor: 2
+        maxDuration: 10m
+  ignoreDifferences:
+    # The database password is created out of band against the live cluster
+    # (see apps/erp/base/erp/secret.yaml). Without this, selfHeal would
+    # faithfully overwrite the real password with the repo's placeholder on
+    # every reconcile and take the database down.
+    - group: ""
+      kind: Secret
+      name: erp-db
+      jsonPointers:
+        - /data
+        - /stringData

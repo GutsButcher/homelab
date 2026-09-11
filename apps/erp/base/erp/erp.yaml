@@ -1,0 +1,291 @@
+# The ERPNext application itself: web, background workers, scheduler and the
+# realtime socket server.
+#
+# All four run the SAME image with different commands. That is deliberate —
+# a worker executing different code from the web process is a class of bug
+# that only shows up as jobs failing in ways the UI cannot reproduce.
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: erp
+  namespace: erp
+  labels:
+    app.kubernetes.io/name: erp
+    app.kubernetes.io/component: web
+spec:
+  selector:
+    app.kubernetes.io/name: erp
+    app.kubernetes.io/component: web
+  ports:
+    - name: http
+      port: 8000
+      targetPort: http
+    - name: socketio
+      port: 9000
+      targetPort: socketio
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: erp
+  namespace: erp
+  labels:
+    app.kubernetes.io/name: erp
+    app.kubernetes.io/component: web
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: erp
+      app.kubernetes.io/component: web
+  strategy:
+    # Recreate, not RollingUpdate: the sites volume is ReadWriteOnce, so a
+    # second pod cannot mount it while the first still holds it — a rolling
+    # update would deadlock waiting for a volume that never detaches.
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: erp
+        app.kubernetes.io/component: web
+    spec:
+      securityContext:
+        fsGroup: 1000
+      initContainers:
+        # Frappe refuses to start against a database that is not yet accepting
+        # connections, and a CrashLoopBackOff at boot looks like a broken image
+        # rather than a slow dependency.
+        - name: wait-for-db
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              until nc -z erp-db 3306; do
+                echo "waiting for erp-db:3306"
+                sleep 3
+              done
+              echo "database reachable"
+      containers:
+        - name: erp
+          image: gwynbliedd/erpnext-van-sales:latest
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - configMapRef:
+                name: erp-config
+          env:
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: erp-db
+                  key: root-password
+          ports:
+            - name: http
+              containerPort: 8000
+            - name: socketio
+              containerPort: 9000
+          startupProbe:
+            # ERPNext takes well over a minute to become useful on first boot.
+            # Without a startupProbe the liveness probe kills it mid-migration,
+            # forever.
+            httpGet:
+              path: /api/method/ping
+              port: http
+            periodSeconds: 10
+            failureThreshold: 30
+          readinessProbe:
+            httpGet:
+              path: /api/method/ping
+              port: http
+            periodSeconds: 15
+            timeoutSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /api/method/ping
+              port: http
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 4
+          resources:
+            requests:
+              cpu: 200m
+              memory: 1Gi
+            limits:
+              memory: 3Gi
+          volumeMounts:
+            - name: sites
+              mountPath: /home/frappe/frappe-bench/sites
+      volumes:
+        - name: sites
+          persistentVolumeClaim:
+            claimName: erp-sites
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: erp-sites
+  namespace: erp
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: erp-queue-short
+  namespace: erp
+  labels:
+    app.kubernetes.io/name: erp
+    app.kubernetes.io/component: queue-short
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: erp
+      app.kubernetes.io/component: queue-short
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: erp
+        app.kubernetes.io/component: queue-short
+    spec:
+      securityContext:
+        fsGroup: 1000
+      containers:
+        - name: worker
+          image: gwynbliedd/erpnext-van-sales:latest
+          imagePullPolicy: IfNotPresent
+          command: ["bench", "worker", "--queue", "short,default"]
+          envFrom:
+            - configMapRef:
+                name: erp-config
+          env:
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: erp-db
+                  key: root-password
+          resources:
+            requests:
+              cpu: 100m
+              memory: 512Mi
+            limits:
+              memory: 1536Mi
+          volumeMounts:
+            - name: sites
+              mountPath: /home/frappe/frappe-bench/sites
+      volumes:
+        - name: sites
+          persistentVolumeClaim:
+            claimName: erp-sites
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: erp-queue-long
+  namespace: erp
+  labels:
+    app.kubernetes.io/name: erp
+    app.kubernetes.io/component: queue-long
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: erp
+      app.kubernetes.io/component: queue-long
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: erp
+        app.kubernetes.io/component: queue-long
+    spec:
+      securityContext:
+        fsGroup: 1000
+      containers:
+        - name: worker
+          image: gwynbliedd/erpnext-van-sales:latest
+          imagePullPolicy: IfNotPresent
+          command: ["bench", "worker", "--queue", "long"]
+          envFrom:
+            - configMapRef:
+                name: erp-config
+          env:
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: erp-db
+                  key: root-password
+          resources:
+            requests:
+              cpu: 100m
+              memory: 512Mi
+            limits:
+              memory: 2Gi
+          volumeMounts:
+            - name: sites
+              mountPath: /home/frappe/frappe-bench/sites
+      volumes:
+        - name: sites
+          persistentVolumeClaim:
+            claimName: erp-sites
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: erp-scheduler
+  namespace: erp
+  labels:
+    app.kubernetes.io/name: erp
+    app.kubernetes.io/component: scheduler
+spec:
+  # Exactly one. Two schedulers double every cron job, which for this system
+  # means duplicate contract-expiry alerts and double-posted scheduled work.
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: erp
+      app.kubernetes.io/component: scheduler
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: erp
+        app.kubernetes.io/component: scheduler
+    spec:
+      securityContext:
+        fsGroup: 1000
+      containers:
+        - name: scheduler
+          image: gwynbliedd/erpnext-van-sales:latest
+          imagePullPolicy: IfNotPresent
+          command: ["bench", "schedule"]
+          envFrom:
+            - configMapRef:
+                name: erp-config
+          env:
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: erp-db
+                  key: root-password
+          resources:
+            requests:
+              cpu: 50m
+              memory: 256Mi
+            limits:
+              memory: 768Mi
+          volumeMounts:
+            - name: sites
+              mountPath: /home/frappe/frappe-bench/sites
+      volumes:
+        - name: sites
+          persistentVolumeClaim:
+            claimName: erp-sites

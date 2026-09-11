@@ -1,0 +1,33 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: erp
+
+resources:
+  - erp/namespace.yaml
+  - erp/secret.yaml
+  - erp/data.yaml
+  - erp/erp.yaml
+
+# Settings shared by every overlay. Anything environment-specific (the site
+# name, the hostname) belongs in the overlay — a base that already knows it is
+# production cannot be reused for staging.
+configMapGenerator:
+  - name: erp-config
+    literals:
+      - DB_HOST=erp-db
+      - DB_PORT=3306
+      - REDIS_CACHE=redis://erp-redis-cache:6379
+      - REDIS_QUEUE=redis://erp-redis-queue:6379
+      - SOCKETIO_PORT=9000
+
+# A hashed ConfigMap name changes on every render, which shows up in ArgoCD as
+# a permanent diff on a resource nobody touched.
+generatorOptions:
+  disableNameSuffixHash: true
+
+labels:
+  - includeSelectors: false
+    pairs:
+      app.kubernetes.io/part-of: erp
+      app.kubernetes.io/managed-by: argocd
