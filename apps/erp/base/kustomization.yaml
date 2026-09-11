@@ -5,7 +5,7 @@ namespace: erp
 
 resources:
   - erp/namespace.yaml
-  - erp/secret.yaml
+  - erp/db-bootstrap.yaml
   - erp/data.yaml
   - erp/erp.yaml
 

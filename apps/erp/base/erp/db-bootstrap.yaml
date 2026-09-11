@@ -1,0 +1,121 @@
+# Database password bootstrap.
+#
+# The problem this solves: MariaDB needs a stable root password that survives
+# restarts, the password must NOT live in git, and sealing one with kubeseal
+# requires cluster access that the build machine does not have.
+#
+# The answer is to let the cluster mint its own. This Job generates a random
+# password and creates the Secret in-cluster on first sync. Nothing secret ever
+# enters the repository, and no human has to run anything — adding these files
+# to homelab is genuinely sufficient.
+#
+# Ordering is by sync-wave, not by hope:
+#   -2  the identity the Job runs as
+#   -1  the Job itself
+#    0  everything else, including MariaDB, which needs the Secret to exist
+#
+# ArgoCD waits for each wave to become healthy before starting the next.
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: erp-db-bootstrap
+  namespace: erp
+  annotations:
+    argocd.argoproj.io/sync-wave: "-2"
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: erp-db-bootstrap
+  namespace: erp
+  annotations:
+    argocd.argoproj.io/sync-wave: "-2"
+rules:
+  # Deliberately minimal: create a secret, and read back the one it manages.
+  # No delete and no update — a bug in this Job must not be able to rotate a
+  # live database password and lock the cluster out of its own data.
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["create"]
+  - apiGroups: [""]
+    resources: ["secrets"]
+    resourceNames: ["erp-db"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: erp-db-bootstrap
+  namespace: erp
+  annotations:
+    argocd.argoproj.io/sync-wave: "-2"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: erp-db-bootstrap
+subjects:
+  - kind: ServiceAccount
+    name: erp-db-bootstrap
+    namespace: erp
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: erp-db-bootstrap
+  namespace: erp
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+    # Re-created on each sync so the check runs again after a namespace wipe.
+    # It is a no-op whenever the secret already exists.
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  backoffLimit: 3
+  ttlSecondsAfterFinished: 300
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: erp-db-bootstrap
+    spec:
+      restartPolicy: OnFailure
+      serviceAccountName: erp-db-bootstrap
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+      containers:
+        - name: bootstrap
+          image: bitnami/kubectl:1.31
+          command:
+            - /bin/bash
+            - -c
+            - |
+              set -euo pipefail
+
+              if kubectl -n erp get secret erp-db >/dev/null 2>&1; then
+                echo "erp-db already exists — leaving it alone"
+                exit 0
+              fi
+
+              echo "minting a new database password"
+
+              # /dev/urandom rather than $RANDOM: the latter is seeded from the
+              # pid and clock, which in a container that starts at a predictable
+              # moment is not a secret at all.
+              #
+              # Alphanumeric only. MariaDB's root password travels through shell
+              # invocations in the entrypoint and in probes, and a quote or a $
+              # in it turns a healthy database into an authentication failure
+              # nobody can debug without reading the password out loud.
+              password="$(LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c 32)"
+
+              kubectl -n erp create secret generic erp-db \
+                --from-literal=root-password="$password"
+
+              echo "erp-db created"
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              memory: 128Mi

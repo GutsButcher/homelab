@@ -27,8 +27,8 @@ spec:
     syncOptions:
       - ServerSideApply=true
       - RespectIgnoreDifferences=true
-      # The namespace is in the manifests, but ordering during a first sync is
-      # not guaranteed without this.
+      # The namespace is in the manifests at sync-wave -3, but ordering on a
+      # very first sync is not guaranteed without this.
       - CreateNamespace=true
     retry:
       limit: 5
@@ -37,13 +37,11 @@ spec:
         factor: 2
         maxDuration: 10m
   ignoreDifferences:
-    # The database password is created out of band against the live cluster
-    # (see apps/erp/base/erp/secret.yaml). Without this, selfHeal would
-    # faithfully overwrite the real password with the repo's placeholder on
-    # every reconcile and take the database down.
+    # erp-db is minted inside the cluster by the wave -1 bootstrap Job and is
+    # deliberately absent from git. Without this, ArgoCD would see a Secret it
+    # does not manage and report the application permanently OutOfSync.
     - group: ""
       kind: Secret
       name: erp-db
       jsonPointers:
         - /data
-        - /stringData
