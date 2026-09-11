@@ -85,7 +85,7 @@ spec:
         runAsUser: 1001
       containers:
         - name: bootstrap
-          image: bitnami/kubectl:1.31
+          image: bitnamilegacy/kubectl:1.31
           command:
             - /bin/bash
             - -c
