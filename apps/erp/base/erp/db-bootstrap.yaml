@@ -81,16 +81,33 @@ spec:
       restartPolicy: OnFailure
       serviceAccountName: erp-db-bootstrap
       securityContext:
+        # alpine/k8s runs as root by default. Nothing here needs it: the Job
+        # talks to the API server over the network and writes no files.
         runAsNonRoot: true
         runAsUser: 1001
+        runAsGroup: 1001
       containers:
         - name: bootstrap
+          # NOT bitnami/kubectl — Bitnami retired every numbered tag on Docker
+          # Hub (only `latest` survives), so `bitnami/kubectl:1.31` fails with
+          # ImagePullBackOff. The Job never runs, the secret is never created,
+          # MariaDB never starts, and the whole application serves 503 with
+          # nothing in the logs to explain why.
+          #
+          # bitnamilegacy still publishes the numbered tags, ships a shell, and
+          # already runs as uid 1001. (rancher/kubectl has kubectl but no shell
+          # at all, so this script could not run there.)
           image: bitnamilegacy/kubectl:1.31
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
           command:
-            - /bin/bash
+            - /bin/sh
             - -c
             - |
-              set -euo pipefail
+              set -eu
 
               if kubectl -n erp get secret erp-db >/dev/null 2>&1; then
                 echo "erp-db already exists — leaving it alone"
@@ -100,14 +117,14 @@ spec:
               echo "minting a new database password"
 
               # /dev/urandom rather than $RANDOM: the latter is seeded from the
-              # pid and clock, which in a container that starts at a predictable
+              # pid and clock, which in a container starting at a predictable
               # moment is not a secret at all.
               #
-              # Alphanumeric only. MariaDB's root password travels through shell
-              # invocations in the entrypoint and in probes, and a quote or a $
-              # in it turns a healthy database into an authentication failure
-              # nobody can debug without reading the password out loud.
-              password="$(LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c 32)"
+              # Alphanumeric only. MariaDB's root password travels through
+              # shell invocations in the entrypoint and in probes, and a quote
+              # or a $ in it turns a healthy database into an authentication
+              # failure nobody can debug without reading the password aloud.
+              password="$(tr -dc 'A-Za-z0-9' </dev/urandom | head -c 32)"
 
               kubectl -n erp create secret generic erp-db \
                 --from-literal=root-password="$password"
