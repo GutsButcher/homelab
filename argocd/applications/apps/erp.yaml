@@ -45,3 +45,14 @@ spec:
       name: erp-db
       jsonPointers:
         - /data
+    # The API server defaults volumeMode, creationTimestamp and a status block
+    # into each volumeClaimTemplate. None of them are in the manifest, so ArgoCD
+    # sees a diff on every comparison — and volumeClaimTemplates is IMMUTABLE on
+    # a StatefulSet, so selfHeal cannot ever close it. Left alone this spins:
+    # the application sat OutOfSync through 91 consecutive auto-heal attempts
+    # that all "succeeded" and changed nothing.
+    - group: apps
+      kind: StatefulSet
+      name: erp-db
+      jsonPointers:
+        - /spec/volumeClaimTemplates
