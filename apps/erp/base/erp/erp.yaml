@@ -85,29 +85,30 @@ spec:
                   name: erp-db
                   key: root-password
           ports:
-            - name: http
+            # Not named `http`: that name belongs to nginx below, which is what
+            # the Service actually targets. gunicorn is an upstream here, not
+            # the thing clients talk to.
+            - name: gunicorn
               containerPort: 8000
-            - name: socketio
-              containerPort: 9000
           startupProbe:
             # ERPNext takes well over a minute to become useful on first boot.
             # Without a startupProbe the liveness probe kills it mid-migration,
             # forever.
             httpGet:
               path: /api/method/ping
-              port: http
+              port: gunicorn
             periodSeconds: 10
             failureThreshold: 30
           readinessProbe:
             httpGet:
               path: /api/method/ping
-              port: http
+              port: gunicorn
             periodSeconds: 15
             timeoutSeconds: 5
           livenessProbe:
             httpGet:
               path: /api/method/ping
-              port: http
+              port: gunicorn
             periodSeconds: 30
             timeoutSeconds: 10
             failureThreshold: 4
@@ -118,6 +119,87 @@ spec:
             limits:
               memory: 3Gi
           volumeMounts:
+            - name: sites
+              mountPath: /home/frappe/frappe-bench/sites
+
+        # The realtime server. Frappe's desk opens a socket.io connection on
+        # every page load; without this the browser retries it forever and
+        # notifications, background-job progress bars and list refreshes never
+        # arrive. The Service and the IngressRoute have always routed port 9000
+        # here — nothing was listening on it.
+        - name: socketio
+          image: gwynbliedd/erpnext-van-sales:latest
+          imagePullPolicy: IfNotPresent
+          workingDir: /home/frappe/frappe-bench
+          command: ["node", "apps/frappe/socketio.js"]
+          envFrom:
+            - configMapRef:
+                name: erp-config
+          ports:
+            - name: socketio
+              containerPort: 9000
+          # Reads redis_socketio out of sites/common_site_config.json, which is
+          # written by the site-bootstrap Job.
+          volumeMounts:
+            - name: sites
+              mountPath: /home/frappe/frappe-bench/sites
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              memory: 512Mi
+
+        # nginx is not optional decoration — gunicorn does not serve static
+        # files at all. Frappe builds its CSS/JS into sites/assets and expects
+        # a web server in front to hand them out; with gunicorn alone every
+        # /assets/... request 404s and the desk renders as unstyled HTML with
+        # "$ is not defined" in the console. /files (user attachments) comes
+        # from the same place.
+        #
+        # The image already ships the server, the config template and the
+        # entrypoint that renders one into the other — this deployment simply
+        # never ran it.
+        - name: nginx
+          image: gwynbliedd/erpnext-van-sales:latest
+          imagePullPolicy: IfNotPresent
+          command: ["/usr/local/bin/nginx-entrypoint.sh"]
+          envFrom:
+            # Supplies FRAPPE_SITE_NAME_HEADER, which the template uses both as
+            # server_name and as the site directory to try_files into.
+            - configMapRef:
+                name: erp-config
+          env:
+            # Same pod, so both upstreams are on loopback.
+            - name: BACKEND
+              value: 127.0.0.1:8000
+            - name: SOCKETIO
+              value: 127.0.0.1:9000
+            # Traefik is the only thing that ever talks to this container, and
+            # it sits inside the pod network.
+            - name: UPSTREAM_REAL_IP_ADDRESS
+              value: 10.42.0.0/16
+          ports:
+            # The name the Service targets.
+            - name: http
+              containerPort: 8080
+          readinessProbe:
+            # Through nginx, so this fails if either nginx or its upstream is
+            # unhealthy. No Host header needed: nginx sets X-Frappe-Site-Name
+            # on the proxied request itself.
+            httpGet:
+              path: /api/method/ping
+              port: http
+            periodSeconds: 15
+            timeoutSeconds: 5
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              memory: 256Mi
+          volumeMounts:
+            # root points at this directory; /assets resolves inside it.
             - name: sites
               mountPath: /home/frappe/frappe-bench/sites
       volumes:
