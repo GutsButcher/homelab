@@ -30,6 +30,10 @@ kind: Deployment
 metadata:
   name: erp
   namespace: erp
+  annotations:
+    # After erp-site-bootstrap (wave 1). Without a site in the volume this
+    # pod serves 404 to its own startupProbe and never becomes healthy.
+    argocd.argoproj.io/sync-wave: "2"
   labels:
     app.kubernetes.io/name: erp
     app.kubernetes.io/component: web
@@ -137,6 +141,10 @@ kind: Deployment
 metadata:
   name: erp-queue-short
   namespace: erp
+  annotations:
+    # After erp-site-bootstrap (wave 1): `bench worker` reads sites/apps.txt
+    # at startup and aborts if it is missing.
+    argocd.argoproj.io/sync-wave: "2"
   labels:
     app.kubernetes.io/name: erp
     app.kubernetes.io/component: queue-short
@@ -189,6 +197,8 @@ kind: Deployment
 metadata:
   name: erp-queue-long
   namespace: erp
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
   labels:
     app.kubernetes.io/name: erp
     app.kubernetes.io/component: queue-long
@@ -241,6 +251,8 @@ kind: Deployment
 metadata:
   name: erp-scheduler
   namespace: erp
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
   labels:
     app.kubernetes.io/name: erp
     app.kubernetes.io/component: scheduler

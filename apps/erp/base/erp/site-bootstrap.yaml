@@ -1,0 +1,191 @@
+# Site bootstrap.
+#
+# The problem this solves: the container image ships the *code* (frappe,
+# erpnext and the custom apps) but a Frappe bench is useless until a SITE has
+# been created inside the sites volume. Nothing in the image does that — its
+# entrypoint only symlinks assets — so without this Job a freshly deployed
+# namespace comes up looking healthy and is not:
+#
+#   * sites/apps.txt does not exist, so `bench worker` and `bench schedule`
+#     abort at startup with `OSError: ./apps.txt Not Found` and the queue and
+#     scheduler Deployments sit in CrashLoopBackOff forever.
+#   * sites/common_site_config.json does not exist and no site directory
+#     exists, so gunicorn boots happily and then answers EVERY request with
+#     404 — including /api/method/ping, which means the web Deployment's
+#     startupProbe kills it on a loop.
+#
+# Both symptoms read as "the image is broken" and neither is.
+#
+# apps.txt in particular is not a one-time concern: the image bakes it at
+# /home/frappe/frappe-bench/sites/apps.txt, and mounting the sites PVC over
+# that directory SHADOWS it. It has to be rewritten from `ls apps` on every
+# run, or an image that adds an app silently keeps the old app list.
+#
+# Ordering is by sync-wave:
+#   -2  the identity the db-bootstrap Job runs as
+#   -1  db-bootstrap — mints erp-db and erp-admin
+#    0  MariaDB and Redis, which need those Secrets
+#    1  this Job, which needs MariaDB accepting connections
+#    2  web / queue / scheduler, which need the site to exist
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: erp-site-bootstrap
+  namespace: erp
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+    # A Job's pod template is immutable, so editing this file and re-syncing
+    # would fail with "field is immutable" if it were an ordinary resource.
+    # As a hook with BeforeHookCreation, ArgoCD deletes and recreates it on
+    # every sync instead — which is also what makes the migrate path below run
+    # after an image bump.
+    argocd.argoproj.io/hook: Sync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  backoffLimit: 2
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: erp-site-bootstrap
+    spec:
+      restartPolicy: Never
+      securityContext:
+        # Matches the app Deployments: the sites PVC is group-writable by 1000
+        # and a mismatch here leaves a site directory the web pod cannot write.
+        fsGroup: 1000
+      containers:
+        - name: bootstrap
+          # The application image, not a generic one: creating a site means
+          # running this bench's own code against this bench's own apps.
+          image: gwynbliedd/erpnext-van-sales:latest
+          imagePullPolicy: IfNotPresent
+          workingDir: /home/frappe/frappe-bench
+          envFrom:
+            - configMapRef:
+                name: erp-config
+          env:
+            - name: SITE_NAME
+              value: erp.gwynbliedd.com
+            # Which apps to install AT SITE CREATION, space separated.
+            #
+            # Deliberately not "every app in the image". Both custom apps
+            # currently abort in their own after_install hook against a bench
+            # that has no `hrms`:
+            #
+            #   van_sales  setup/custom_fields.py:129 declares a custom field on
+            #              the "Expense Claim" DocType -> LinkValidationError:
+            #              Could not find DocType: Expense Claim
+            #   fleet      setup/install.py:51 links its workspace to the
+            #              "Vehicle Log" DocType -> LinkValidationError:
+            #              Could not find Row #4: Link To: Vehicle Log
+            #
+            # Both DocTypes moved out of erpnext into the separate `hrms` app.
+            # Until the apps guard those references (or hrms joins the image),
+            # installing them takes the whole site down with them, because
+            # `bench new-site` does not roll back a failed install-app.
+            #
+            # Add them back here once fixed; `bench install-app` on the live
+            # site does the same job without recreating it.
+            - name: INSTALL_APPS
+              value: "erpnext"
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: erp-db
+                  key: root-password
+            - name: ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: erp-admin
+                  key: admin-password
+          command:
+            - bash
+            - -c
+            - |
+              set -eu
+              cd /home/frappe/frappe-bench
+
+              # Rewritten every run — the PVC mount shadows the baked copy.
+              ls -1 apps > sites/apps.txt
+
+              # `bench set-config -g` opens this file for reading before it
+              # writes, so it cannot create it.
+              if [ ! -f sites/common_site_config.json ]; then
+                printf '{}\n' > sites/common_site_config.json
+              fi
+
+              bench set-config -g  db_host        "$DB_HOST"
+              bench set-config -gp db_port        "$DB_PORT"
+              bench set-config -g  redis_cache    "$REDIS_CACHE"
+              bench set-config -g  redis_queue    "$REDIS_QUEUE"
+              bench set-config -g  redis_socketio "$REDIS_QUEUE"
+              bench set-config -gp socketio_port  "$SOCKETIO_PORT"
+
+              # Fail with an explanation rather than 60 lines of MySQLdb
+              # traceback. This is the single most likely way this namespace
+              # breaks — see the DANGER note in db-bootstrap.yaml.
+              env/bin/python - <<'PREFLIGHT'
+              import os, sys, MySQLdb
+              try:
+                  MySQLdb.connect(host=os.environ["DB_HOST"],
+                                  port=int(os.environ["DB_PORT"]),
+                                  user="root",
+                                  password=os.environ["DB_PASSWORD"])
+              except MySQLdb.OperationalError as e:
+                  sys.exit(
+                      f"\nPREFLIGHT FAILED: cannot authenticate to MariaDB as root: {e}\n"
+                      "The erp-db Secret no longer matches the password MariaDB\n"
+                      "holds on disk. MariaDB only reads MARIADB_ROOT_PASSWORD when\n"
+                      "it initialises an EMPTY datadir, so re-minting that Secret\n"
+                      "afterwards divorces the two permanently. Recover with ALTER\n"
+                      "USER on the running database, or by deleting the erp-db PVC\n"
+                      "(which destroys all data).\n")
+              print("preflight: MariaDB root auth OK")
+              PREFLIGHT
+
+              # site_config.json rather than the directory: a `bench new-site`
+              # that dies partway still leaves the directory behind, and a
+              # directory-only check then sends every later run down the
+              # migrate path against a database that was never created.
+              if [ -f "sites/$SITE_NAME/site_config.json" ]; then
+                echo "site $SITE_NAME already exists — migrating"
+                bench --site "$SITE_NAME" migrate
+                exit 0
+              fi
+
+              APP_FLAGS=""
+              for app in $INSTALL_APPS; do
+                APP_FLAGS="$APP_FLAGS --install-app $app"
+              done
+
+              echo "creating site $SITE_NAME with:$APP_FLAGS"
+              # Word splitting on APP_FLAGS is intended.
+              # shellcheck disable=SC2086
+              bench new-site "$SITE_NAME" \
+                --db-root-username root \
+                --db-root-password "$DB_PASSWORD" \
+                --admin-password "$ADMIN_PASSWORD" \
+                --mariadb-user-host-login-scope=% \
+                --set-default \
+                $APP_FLAGS
+
+              # New sites ship with the scheduler disabled, which would leave
+              # the scheduler Deployment Running and idle — the most confusing
+              # possible state for it to be in.
+              bench --site "$SITE_NAME" enable-scheduler
+
+              echo "site $SITE_NAME created"
+          resources:
+            requests:
+              cpu: 200m
+              memory: 1Gi
+            limits:
+              memory: 3Gi
+          volumeMounts:
+            - name: sites
+              mountPath: /home/frappe/frappe-bench/sites
+      volumes:
+        - name: sites
+          persistentVolumeClaim:
+            claimName: erp-sites

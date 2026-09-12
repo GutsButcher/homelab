@@ -40,7 +40,7 @@ rules:
     verbs: ["create"]
   - apiGroups: [""]
     resources: ["secrets"]
-    resourceNames: ["erp-db"]
+    resourceNames: ["erp-db", "erp-admin"]
     verbs: ["get"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -109,13 +109,6 @@ spec:
             - |
               set -eu
 
-              if kubectl -n erp get secret erp-db >/dev/null 2>&1; then
-                echo "erp-db already exists — leaving it alone"
-                exit 0
-              fi
-
-              echo "minting a new database password"
-
               # /dev/urandom rather than $RANDOM: the latter is seeded from the
               # pid and clock, which in a container starting at a predictable
               # moment is not a secret at all.
@@ -124,12 +117,49 @@ spec:
               # shell invocations in the entrypoint and in probes, and a quote
               # or a $ in it turns a healthy database into an authentication
               # failure nobody can debug without reading the password aloud.
-              password="$(tr -dc 'A-Za-z0-9' </dev/urandom | head -c 32)"
+              mint() {
+                tr -dc 'A-Za-z0-9' </dev/urandom | head -c 32
+              }
 
-              kubectl -n erp create secret generic erp-db \
-                --from-literal=root-password="$password"
+              # DANGER — erp-db must outlive every re-sync.
+              #
+              # MariaDB reads MARIADB_ROOT_PASSWORD exactly once, when it
+              # initialises an EMPTY datadir. If this Secret is ever deleted
+              # while the erp-db PVC survives, the next run of this Job mints a
+              # password the database will never adopt, and the two are divorced
+              # permanently: MariaDB keeps the old password on disk, every
+              # client gets the new one, and the whole namespace fails with
+              # "Access denied for user 'root'". The Role below has no `update`
+              # verb precisely so a bug here cannot rotate a live password — but
+              # nothing can stop a manual `kubectl delete secret erp-db`.
+              #
+              # If that happens, recovery is either ALTER USER on the running
+              # database to match the new Secret, or deleting the erp-db PVC to
+              # let MariaDB re-initialise (which destroys all data).
+              if kubectl -n erp get secret erp-db >/dev/null 2>&1; then
+                echo "erp-db already exists — leaving it alone"
+              else
+                echo "minting a new database password"
+                kubectl -n erp create secret generic erp-db \
+                  --from-literal=root-password="$(mint)"
+                echo "erp-db created"
+              fi
 
-              echo "erp-db created"
+              # The ERPNext Administrator password. Read it with:
+              #   kubectl -n erp get secret erp-admin \
+              #     -o jsonpath='{.data.admin-password}' | base64 -d
+              #
+              # Unlike erp-db this one is safe to lose: it is only consumed at
+              # site creation, and afterwards `bench set-admin-password` is the
+              # way to change it.
+              if kubectl -n erp get secret erp-admin >/dev/null 2>&1; then
+                echo "erp-admin already exists — leaving it alone"
+              else
+                echo "minting a new admin password"
+                kubectl -n erp create secret generic erp-admin \
+                  --from-literal=admin-password="$(mint)"
+                echo "erp-admin created"
+              fi
           resources:
             requests:
               cpu: 10m

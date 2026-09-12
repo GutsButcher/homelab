@@ -7,6 +7,7 @@ resources:
   - erp/namespace.yaml
   - erp/db-bootstrap.yaml
   - erp/data.yaml
+  - erp/site-bootstrap.yaml
   - erp/erp.yaml
 
 # Settings shared by every overlay. Anything environment-specific (the site

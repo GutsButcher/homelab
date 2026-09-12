@@ -1,0 +1,39 @@
+# Frappe resolves which site to serve from the HTTP Host header. The kubelet
+# sends `Host: <podIP>` on an httpGet probe, no site matches that, and gunicorn
+# answers 404 — so every probe on the web pod fails even though the site is
+# perfectly healthy. The startupProbe then kills the container on a loop, which
+# looks exactly like a crashing application and is not one.
+#
+# FRAPPE_SITE_NAME_HEADER does NOT fix this: that variable is read by the nginx
+# entrypoint in the upstream frappe_docker image, and this deployment serves
+# gunicorn directly with no nginx in front of it. Neither does `default_site` in
+# common_site_config.json — frappe still resolves by Host first.
+#
+# So the probes have to say who they are asking for. This lives in the overlay
+# rather than the base because the hostname is environment-specific, the same
+# reason FRAPPE_SITE_NAME_HEADER is set here.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: erp
+  namespace: erp
+spec:
+  template:
+    spec:
+      containers:
+        - name: erp
+          startupProbe:
+            httpGet:
+              httpHeaders:
+                - name: Host
+                  value: erp.gwynbliedd.com
+          readinessProbe:
+            httpGet:
+              httpHeaders:
+                - name: Host
+                  value: erp.gwynbliedd.com
+          livenessProbe:
+            httpGet:
+              httpHeaders:
+                - name: Host
+                  value: erp.gwynbliedd.com
