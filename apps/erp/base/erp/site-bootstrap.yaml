@@ -67,28 +67,29 @@ spec:
           env:
             - name: SITE_NAME
               value: erp.gwynbliedd.com
-            # Which apps to install AT SITE CREATION, space separated.
+            # Which apps to install, space separated. Applied at site creation
+            # AND reconciled on every later run, so adding one here is enough.
             #
-            # Deliberately not "every app in the image". Both custom apps
-            # currently abort in their own after_install hook against a bench
-            # that has no `hrms`:
+            # van_sales and fleet were excluded because both aborted in their
+            # own after_install hook:
             #
             #   van_sales  setup/custom_fields.py:129 declares a custom field on
-            #              the "Expense Claim" DocType -> LinkValidationError:
-            #              Could not find DocType: Expense Claim
+            #              the "Expense Claim" DocType -> LinkValidationError
             #   fleet      setup/install.py:51 links its workspace to the
-            #              "Vehicle Log" DocType -> LinkValidationError:
-            #              Could not find Row #4: Link To: Vehicle Log
+            #              "Vehicle Log" DocType -> LinkValidationError
             #
-            # Both DocTypes moved out of erpnext into the separate `hrms` app.
-            # Until the apps guard those references (or hrms joins the image),
-            # installing them takes the whole site down with them, because
-            # `bench new-site` does not roll back a failed install-app.
+            # Both DocTypes live in `hrms`, and the image did not contain it:
+            # docker/apps.json listed hrms and NOTHING EVER READ THAT FILE, so
+            # the dependency was declared and never installed. The image now
+            # installs hrms for real, which removes the reason for the
+            # exclusion instead of working around it.
             #
-            # Add them back here once fixed; `bench install-app` on the live
-            # site does the same job without recreating it.
+            # Verified by running the full install against a real MariaDB
+            # before this was committed:
+            #   frappe 16.33.1 · erpnext 16.34.2 · hrms 16.18.1 ·
+            #   van_sales 0.1.0 · fleet 0.1.0
             - name: INSTALL_APPS
-              value: "erpnext"
+              value: "erpnext hrms van_sales fleet"
             - name: DB_PASSWORD
               valueFrom:
                 secretKeyRef:
@@ -149,7 +150,26 @@ spec:
               # directory-only check then sends every later run down the
               # migrate path against a database that was never created.
               if [ -f "sites/$SITE_NAME/site_config.json" ]; then
-                echo "site $SITE_NAME already exists — migrating"
+                echo "site $SITE_NAME already exists"
+
+                # Install whatever INSTALL_APPS lists that the site lacks.
+                # Creation and installation used to be the same step, so a site
+                # created before an app joined the list could never acquire it:
+                # the endpoints answered «App van_sales is not installed» on an
+                # otherwise healthy server, and the only fix was a manual exec.
+                #
+                # Unlike `bench new-site`, a failed `install-app` here leaves
+                # the existing site intact.
+                installed="$(bench --site "$SITE_NAME" list-apps 2>/dev/null || true)"
+                for app in $INSTALL_APPS; do
+                  if echo "$installed" | grep -qw "$app"; then
+                    echo "  ok      $app"
+                  else
+                    echo "  install $app"
+                    bench --site "$SITE_NAME" install-app "$app"
+                  fi
+                done
+
                 bench --site "$SITE_NAME" migrate
                 exit 0
               fi
