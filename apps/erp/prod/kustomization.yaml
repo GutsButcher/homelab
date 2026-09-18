@@ -27,4 +27,4 @@ images:
   # (scripts/update_image_tag.py). This single line is the handoff between the
   # build pipeline and ArgoCD — not edited by hand.
   - name: gwynbliedd/erpnext-van-sales
-    newTag: 20260918-0898bc0
+    newTag: 20260918-f8f8ea1
