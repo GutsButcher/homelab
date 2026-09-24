@@ -51,6 +51,21 @@ spec:
                 secretKeyRef:
                   name: treelink-secrets
                   key: ADMIN_EMAILS
+            # Email (verification, reset, security alerts). Both keys live in the
+            # treelink-secrets SealedSecret; optional so the app boots without them
+            # and logs emails instead of sending.
+            - name: SMTP_URL
+              valueFrom:
+                secretKeyRef:
+                  name: treelink-secrets
+                  key: SMTP_URL
+                  optional: true
+            - name: MAIL_FROM
+              valueFrom:
+                secretKeyRef:
+                  name: treelink-secrets
+                  key: MAIL_FROM
+                  optional: true
             - name: APP_URL
               value: https://treelink.gwynbliedd.com
             - name: UPLOAD_DIR
