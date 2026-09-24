@@ -1,0 +1,13 @@
+---
+# Avatars and covers, re-encoded to WebP by the app. ReadWriteOnce on local-path,
+# which is why the Deployment runs a single replica with a Recreate strategy.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: treelink-uploads
+  namespace: treelink
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 5Gi

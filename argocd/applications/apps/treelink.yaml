@@ -1,0 +1,42 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: treelink
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: homelab
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: treelink
+  sources:
+    # Treelink (link-in-bio platform). Source: github.com/GutsButcher/treelink.
+    # Image tag in apps/treelink/prod/kustomization.yaml is bumped by that repo's
+    # release script; this Application turns the commit into a rollout.
+    - repoURL: https://github.com/GutsButcher/homelab.git
+      targetRevision: main
+      path: apps/treelink/prod
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - ServerSideApply=true
+      - RespectIgnoreDifferences=true
+      - CreateNamespace=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 30s
+        factor: 2
+        maxDuration: 10m
+  ignoreDifferences:
+    # CNPG mints treelink-db-app itself; git never holds it.
+    - group: ""
+      kind: Secret
+      name: treelink-db-app
+      jsonPointers:
+        - /data

@@ -1,0 +1,82 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: treelink
+  namespace: treelink
+  labels:
+    app: treelink
+spec:
+  replicas: 1
+  # The uploads PVC is RWO and the rate limiter is in-process: one pod at a time.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: treelink
+  template:
+    metadata:
+      labels:
+        app: treelink
+    spec:
+      imagePullSecrets:
+        - name: gitea-registry
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        runAsGroup: 1001
+        fsGroup: 1001
+      containers:
+        - name: treelink
+          # Tag is set in apps/treelink/prod/kustomization.yaml by scripts/release.sh
+          # in the treelink repository.
+          image: gitea.gwynbliedd.com/gwynbliedd/treelink:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 3000
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: treelink-db-app
+                  key: uri
+            - name: SESSION_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: treelink-secrets
+                  key: SESSION_SECRET
+            - name: ADMIN_EMAILS
+              valueFrom:
+                secretKeyRef:
+                  name: treelink-secrets
+                  key: ADMIN_EMAILS
+            - name: APP_URL
+              value: https://treelink.gwynbliedd.com
+            - name: UPLOAD_DIR
+              value: /data/uploads
+          volumeMounts:
+            - name: uploads
+              mountPath: /data/uploads
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              memory: 768Mi
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 30
+      volumes:
+        - name: uploads
+          persistentVolumeClaim:
+            claimName: treelink-uploads

@@ -1,0 +1,16 @@
+---
+# HTTP entrypoint only: Cloudflare terminates TLS in front of the tunnel.
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: treelink
+  namespace: treelink
+spec:
+  entryPoints:
+    - web
+  routes:
+    - match: Host(`treelink.gwynbliedd.com`)
+      kind: Rule
+      services:
+        - name: treelink
+          port: 3000

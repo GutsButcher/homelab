@@ -1,0 +1,21 @@
+---
+# CloudNativePG cluster for Treelink. CNPG creates Secret/treelink-db-app with a
+# ready-made `uri` key, which the Deployment reads as DATABASE_URL.
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: treelink-db
+  namespace: treelink
+spec:
+  instances: 1
+  imageName: ghcr.io/cloudnative-pg/postgresql:17.5
+  postgresql:
+    parameters:
+      max_connections: "100"
+      shared_buffers: "128MB"
+  bootstrap:
+    initdb:
+      database: treelink
+      owner: treelink
+  storage:
+    size: 5Gi

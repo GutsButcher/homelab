@@ -1,0 +1,11 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: treelink
+resources:
+  - ../base
+  - ingressroute.yaml
+images:
+  # Written by scripts/release.sh in the treelink repo on every release. This
+  # single line is the handoff between the build and ArgoCD; not edited by hand.
+  - name: gitea.gwynbliedd.com/gwynbliedd/treelink
+    newTag: latest
