@@ -1,4 +1,20 @@
 ---
+# Cloudflare terminates TLS and the tunnel reaches Traefik over plain HTTP, so
+# Traefik tells Gitea `X-Forwarded-Proto: http`. Gitea builds the container
+# registry token realm from that header, which made containerd (k3s image pulls)
+# chase `http://gitea.../v2/token`, hit Cloudflare's HTTPS redirect, and fail
+# with "authorization server did not include a token in the response". Every
+# request that reaches this route was HTTPS at the edge, so say so.
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: gitea-forwarded-https
+  namespace: gitea
+spec:
+  headers:
+    customRequestHeaders:
+      X-Forwarded-Proto: https
+---
 # HTTP traffic
 apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
@@ -11,6 +27,8 @@ spec:
   routes:
     - match: Host(`gitea.gwynbliedd.com`)
       kind: Rule
+      middlewares:
+        - name: gitea-forwarded-https
       services:
         - name: gitea-http
           port: 3000
