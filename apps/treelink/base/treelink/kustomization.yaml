@@ -2,7 +2,9 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
   - secrets.yaml
+  - backup-s3-secret.yaml
   - cnpg.yaml
+  - backup.yaml
   - uploads-pvc.yaml
   - instrumentation.yaml
   - deployment.yaml

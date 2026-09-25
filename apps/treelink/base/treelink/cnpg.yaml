@@ -19,3 +19,23 @@ spec:
       owner: treelink
   storage:
     size: 5Gi
+  # On-prem backups: base backups + WAL archive in RustFS (apps/rustfs, node01),
+  # 14 days of point-in-time recovery. Credentials: SealedSecret treelink-backup-s3.
+  # Procedure and restore drill: docs/BACKUPS.md in the treelink repo.
+  backup:
+    retentionPolicy: "14d"
+    barmanObjectStore:
+      destinationPath: s3://treelink-db/
+      endpointURL: http://rustfs.rustfs.svc.cluster.local:9000
+      s3Credentials:
+        accessKeyId:
+          name: treelink-backup-s3
+          key: ACCESS_KEY_ID
+        secretAccessKey:
+          name: treelink-backup-s3
+          key: ACCESS_SECRET_KEY
+      wal:
+        compression: gzip
+      data:
+        compression: gzip
+        jobs: 1

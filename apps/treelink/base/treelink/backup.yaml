@@ -1,0 +1,15 @@
+---
+# Daily base backup at 02:10 UTC. WAL archiving (continuous) is configured on the
+# Cluster's backup.barmanObjectStore, which together give point-in-time recovery.
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: treelink-db-daily
+  namespace: treelink
+spec:
+  schedule: "0 10 2 * * *"
+  backupOwnerReference: self
+  cluster:
+    name: treelink-db
+  method: barmanObjectStore
+  immediate: true

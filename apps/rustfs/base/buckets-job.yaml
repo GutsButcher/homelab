@@ -1,0 +1,37 @@
+# Creates the buckets consumers expect. Idempotent (mc mb --ignore-existing);
+# Argo re-runs it on every sync as a PostSync hook.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: rustfs-buckets
+  namespace: rustfs
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
+spec:
+  backoffLimit: 6
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: mc
+          image: minio/mc:RELEASE.2025-08-13T08-35-41Z
+          command:
+            - sh
+            - -c
+            - |
+              set -e
+              for i in $(seq 1 30); do mc alias set r http://rustfs.rustfs.svc.cluster.local:9000 "$RUSTFS_ACCESS_KEY" "$RUSTFS_SECRET_KEY" && break; sleep 5; done
+              mc mb --ignore-existing r/treelink-db
+              mc ls r
+          env:
+            - name: RUSTFS_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: credentials
+                  key: RUSTFS_ACCESS_KEY
+            - name: RUSTFS_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: credentials
+                  key: RUSTFS_SECRET_KEY

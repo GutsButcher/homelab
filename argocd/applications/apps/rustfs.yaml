@@ -13,12 +13,17 @@ spec:
     server: https://kubernetes.default.svc
     namespace: rustfs
   sources:
-    # Plain manifests: namespace, deployment, PVC, sealed secret, Traefik routes.
+    # Plain manifests: namespace, deployment, PVC, sealed secret, bucket job, Traefik
+    # routes. Un-parked 2026-09-25 as the on-prem backup target for treelink-db.
     - repoURL: https://github.com/GutsButcher/homelab.git
       targetRevision: main
       path: apps/rustfs
   syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
     syncOptions:
+      - CreateNamespace=true
       # Apply server-side: several charts here ship CRDs too large for the
       # client-side last-applied-configuration annotation.
       - ServerSideApply=true

@@ -1,3 +1,5 @@
+# RustFS: S3-compatible object store. First consumer: CNPG backups of treelink-db
+# (bucket treelink-db). Credentials come from the sealed Secret "credentials".
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -7,6 +9,8 @@ metadata:
     app: rustfs
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: rustfs
@@ -15,10 +19,13 @@ spec:
       labels:
         app: rustfs
     spec:
+      # Keep the backup store on the other node from the database primary.
+      nodeSelector:
+        kubernetes.io/hostname: node01
       containers:
         - name: rustfs
-          image: rustfs/rustfs:latest
-          imagePullPolicy: Always
+          image: rustfs/rustfs:1.0.0
+          imagePullPolicy: IfNotPresent
           ports:
             - name: api
               containerPort: 9000
@@ -37,9 +44,26 @@ spec:
                 secretKeyRef:
                   name: credentials
                   key: RUSTFS_SECRET_KEY
+            - name: RUSTFS_VOLUMES
+              value: /data
           volumeMounts:
             - name: data
               mountPath: /data
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              memory: 1Gi
+          readinessProbe:
+            tcpSocket:
+              port: api
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: api
+            initialDelaySeconds: 30
+            periodSeconds: 30
       volumes:
         - name: data
           persistentVolumeClaim:

@@ -1,3 +1,5 @@
+# Object store data. local-path on node01, deliberately NOT the node that runs
+# treelink-db (gwynbliedd) so database backups survive the loss of that node.
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -8,4 +10,4 @@ spec:
     - ReadWriteOnce
   resources:
     requests:
-      storage: 3Gi
+      storage: 10Gi
