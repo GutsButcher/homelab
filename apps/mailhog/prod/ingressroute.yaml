@@ -1,0 +1,20 @@
+---
+# The UI shows every test email, so it sits behind Authentik like the other
+# internal tools. HTTP entrypoint only: Cloudflare terminates TLS.
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: mailhog
+  namespace: mailhog
+spec:
+  entryPoints:
+    - web
+  routes:
+    - match: Host(`mailhog.gwynbliedd.com`)
+      kind: Rule
+      middlewares:
+        - name: authentik-forwardauth
+          namespace: mailhog
+      services:
+        - name: mailhog
+          port: 8025
