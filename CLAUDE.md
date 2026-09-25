@@ -119,6 +119,16 @@ Same, minus steps 6 and 8, and the `Application` gets a single `path:` source.
   are parked in `argocd/parked/` — enabling them would install MetalLB and claim
   `192.168.100.210`.
 
+## Apps built from private source (Treelink)
+
+Treelink's image lives in the Gitea container registry (`gitea.gwynbliedd.com/gwynbliedd/treelink`),
+pulled with the sealed `gitea-registry` secret. Its repo (`github.com/GutsButcher/treelink`,
+private) owns the release: `npm run release` builds, pushes and rewrites `newTag` in
+`apps/treelink/prod/kustomization.yaml`. containerd could only fetch registry tokens after the
+`gitea-forwarded-https` Middleware started sending `X-Forwarded-Proto: https` to Gitea (see
+`apps/gitea/prod/gitea/ingressroute.yaml`). Email from apps goes to MailHog (`apps/mailhog`),
+in-cluster only.
+
 ## Deployment dependencies
 
 Sync waves give the ordering Flux got from `dependsOn`:

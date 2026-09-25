@@ -62,8 +62,10 @@ principles for continuous deployment and infrastructure management.
 | Homepage | `home.gwynbliedd.com` | Helm `homepage` |
 | Kavita | `books.gwynbliedd.com` | manifests |
 | Linkding | `linkding.gwynbliedd.com` | Helm `linkding` |
+| MailHog (SMTP test sink) | `mailhog.gwynbliedd.com` | manifests |
 | Monitoring (Prometheus + Grafana) | `grafana.gwynbliedd.com` | Helm `kube-prometheus-stack` |
 | n8n | `n8n.gwynbliedd.com` | manifests |
+| Treelink (link-in-bio) | `treelink.gwynbliedd.com` | manifests, image from Gitea registry |
 | pgAdmin | `pgadmin.gwynbliedd.com` | Helm `pgadmin4` |
 | RustFS (S3) | `s3.gwynbliedd.com`, `s3-api.gwynbliedd.com` | manifests |
 | Vaultwarden | `vaultwarden.gwynbliedd.com` | Helm `vaultwarden` |
