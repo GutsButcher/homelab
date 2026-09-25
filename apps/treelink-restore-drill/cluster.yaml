@@ -5,7 +5,7 @@
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: treelink-db-drill
+  name: treelink-db-drill-pitr
   namespace: treelink
 spec:
   instances: 1
@@ -15,7 +15,9 @@ spec:
   bootstrap:
     recovery:
       source: treelink-db
-      # PITR: set recoveryTarget.targetTime to test point-in-time recovery.
+      # Point-in-time recovery drill: the state just before a marker block was added.
+      recoveryTarget:
+        targetTime: "2026-09-25 19:11:52+00"
   externalClusters:
     - name: treelink-db
       barmanObjectStore:
