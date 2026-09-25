@@ -1,0 +1,24 @@
+---
+# OpenTelemetry auto-instrumentation for the Node.js server (traces + metrics
+# to the LGTM stack via the Alloy gateway, same endpoint as the demo apps).
+# The Deployment opts in with the inject-nodejs annotation.
+apiVersion: opentelemetry.io/v1alpha1
+kind: Instrumentation
+metadata:
+  name: nodejs
+  namespace: treelink
+spec:
+  exporter:
+    endpoint: http://alloy-gateway.monitoring.svc.cluster.local:4318
+  propagators:
+    - tracecontext
+    - baggage
+  sampler:
+    type: parentbased_traceidratio
+    argument: "0.5"
+  nodejs:
+    env:
+      - name: OTEL_SERVICE_NAME
+        value: treelink
+      - name: OTEL_NODE_DISABLED_INSTRUMENTATIONS
+        value: fs,dns,net

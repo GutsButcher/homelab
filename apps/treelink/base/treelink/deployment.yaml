@@ -18,6 +18,8 @@ spec:
     metadata:
       labels:
         app: treelink
+      annotations:
+        instrumentation.opentelemetry.io/inject-nodejs: "true"
     spec:
       imagePullSecrets:
         - name: gitea-registry
@@ -65,6 +67,25 @@ spec:
                 secretKeyRef:
                   name: treelink-secrets
                   key: MAIL_FROM
+                  optional: true
+            # Optional integrations; add the keys to treelink-secrets to enable.
+            - name: TURNSTILE_SITE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: treelink-secrets
+                  key: TURNSTILE_SITE_KEY
+                  optional: true
+            - name: TURNSTILE_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: treelink-secrets
+                  key: TURNSTILE_SECRET_KEY
+                  optional: true
+            - name: WEB_RISK_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: treelink-secrets
+                  key: WEB_RISK_API_KEY
                   optional: true
             - name: APP_URL
               value: https://treelink.gwynbliedd.com

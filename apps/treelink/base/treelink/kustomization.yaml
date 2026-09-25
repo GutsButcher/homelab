@@ -4,5 +4,6 @@ resources:
   - secrets.yaml
   - cnpg.yaml
   - uploads-pvc.yaml
+  - instrumentation.yaml
   - deployment.yaml
   - service.yaml
