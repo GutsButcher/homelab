@@ -1,5 +1,5 @@
-# Creates the buckets consumers expect. Idempotent (mc mb --ignore-existing);
-# Argo re-runs it on every sync as a PostSync hook.
+# Creates the buckets consumers expect. Idempotent; Argo re-runs it on every sync
+# as a PostSync hook. (treelink-db was also auto-created by the first backup.)
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -14,23 +14,30 @@ spec:
     spec:
       restartPolicy: OnFailure
       containers:
-        - name: mc
-          image: minio/mc:RELEASE.2025-08-13T08-35-41Z
+        - name: aws
+          image: amazon/aws-cli:2.37.3
           command:
             - sh
             - -c
             - |
               set -e
-              for i in $(seq 1 30); do mc alias set r http://rustfs.rustfs.svc.cluster.local:9000 "$RUSTFS_ACCESS_KEY" "$RUSTFS_SECRET_KEY" && break; sleep 5; done
-              mc mb --ignore-existing r/treelink-db
-              mc ls r
+              export AWS_EC2_METADATA_DISABLED=true
+              for b in treelink-db; do
+                aws --endpoint-url "$S3_ENDPOINT" s3api head-bucket --bucket "$b" 2>/dev/null \
+                  || aws --endpoint-url "$S3_ENDPOINT" s3api create-bucket --bucket "$b"
+              done
+              aws --endpoint-url "$S3_ENDPOINT" s3 ls
           env:
-            - name: RUSTFS_ACCESS_KEY
+            - name: S3_ENDPOINT
+              value: http://rustfs.rustfs.svc.cluster.local:9000
+            - name: AWS_DEFAULT_REGION
+              value: us-east-1
+            - name: AWS_ACCESS_KEY_ID
               valueFrom:
                 secretKeyRef:
                   name: credentials
                   key: RUSTFS_ACCESS_KEY
-            - name: RUSTFS_SECRET_KEY
+            - name: AWS_SECRET_ACCESS_KEY
               valueFrom:
                 secretKeyRef:
                   name: credentials

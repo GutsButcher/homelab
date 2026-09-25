@@ -1,0 +1,32 @@
+---
+# Restore drill: a scratch cluster recovered from the treelink-db object store.
+# Not part of the production app; the Argo Application for it is added for a drill
+# and removed afterwards (docs/BACKUPS.md in the treelink repo).
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: treelink-db-drill
+  namespace: treelink
+spec:
+  instances: 1
+  imageName: ghcr.io/cloudnative-pg/postgresql:17.5
+  storage:
+    size: 2Gi
+  bootstrap:
+    recovery:
+      source: treelink-db
+      # PITR: set recoveryTarget.targetTime to test point-in-time recovery.
+  externalClusters:
+    - name: treelink-db
+      barmanObjectStore:
+        destinationPath: s3://treelink-db/
+        endpointURL: http://rustfs.rustfs.svc.cluster.local:9000
+        s3Credentials:
+          accessKeyId:
+            name: treelink-backup-s3
+            key: ACCESS_KEY_ID
+          secretAccessKey:
+            name: treelink-backup-s3
+            key: ACCESS_SECRET_KEY
+        wal:
+          compression: gzip
