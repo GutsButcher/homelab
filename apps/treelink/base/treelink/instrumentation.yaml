@@ -22,3 +22,6 @@ spec:
         value: treelink
       - name: OTEL_NODE_DISABLED_INSTRUMENTATIONS
         value: fs,dns,net
+      # No cloud metadata service here; stops the GCP detector warning at boot.
+      - name: OTEL_NODE_RESOURCE_DETECTORS
+        value: env,host,os,process,container
