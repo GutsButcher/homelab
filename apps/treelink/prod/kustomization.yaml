@@ -8,4 +8,4 @@ images:
   # Written by scripts/release.sh in the treelink repo on every release. This
   # single line is the handoff between the build and ArgoCD; not edited by hand.
   - name: gitea.gwynbliedd.com/gwynbliedd/treelink
-    newTag: 20260926-7d17cb3
+    newTag: 20260926-8cc6d82
