@@ -1,6 +1,15 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
-namespace: treelink
+# Namespace only for resources that do not set one, so the Grafana dashboard ConfigMap
+# can stay in the monitoring namespace (dashboard sidecar scope).
+transformers:
+  - |-
+    apiVersion: builtin
+    kind: NamespaceTransformer
+    metadata:
+      name: treelink-namespace
+      namespace: treelink
+    unsetOnly: true
 resources:
   - ../base
   - ingressroute.yaml
@@ -8,4 +17,4 @@ images:
   # Written by scripts/release.sh in the treelink repo on every release. This
   # single line is the handoff between the build and ArgoCD; not edited by hand.
   - name: gitea.gwynbliedd.com/gwynbliedd/treelink
-    newTag: 20260926-800f98d
+    newTag: 20260926-cf85329
