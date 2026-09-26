@@ -258,6 +258,294 @@ data:
                   }
                 }
               ]
+            },
+            {
+              "uid": "treelink-webhook-failures",
+              "title": "TreelinkWebhookFailures",
+              "condition": "C",
+              "for": "15m",
+              "labels": {
+                "severity": "warning",
+                "service": "treelink"
+              },
+              "annotations": {
+                "summary": "More than half of webhook delivery attempts end failed/exhausted for 15 minutes (ratio, not count)",
+                "runbook_url": "https://github.com/GutsButcher/treelink/blob/main/docs/INCIDENT-RESPONSE.md"
+              },
+              "data": [
+                {
+                  "refId": "A",
+                  "relativeTimeRange": {
+                    "from": 1800,
+                    "to": 0
+                  },
+                  "datasourceUid": "mimir",
+                  "model": {
+                    "expr": "sum(rate(treelink_integration_attempts_total{job=\"treelink/treelink\",result=~\"failed|exhausted\"}[15m])) / clamp_min(sum(rate(treelink_integration_attempts_total{job=\"treelink/treelink\"}[15m])), 0.001)",
+                    "instant": true,
+                    "refId": "A"
+                  }
+                },
+                {
+                  "refId": "C",
+                  "datasourceUid": "__expr__",
+                  "model": {
+                    "type": "threshold",
+                    "refId": "C",
+                    "expression": "A",
+                    "conditions": [
+                      {
+                        "evaluator": {
+                          "type": "gt",
+                          "params": [
+                            0.5
+                          ]
+                        }
+                      }
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "uid": "treelink-webhook-queue-due",
+              "title": "TreelinkWebhookQueueDue",
+              "condition": "C",
+              "for": "10m",
+              "labels": {
+                "severity": "warning",
+                "service": "treelink"
+              },
+              "annotations": {
+                "summary": "Webhook deliveries due now exceed 20 for 10 minutes: the worker is stuck or overwhelmed (global gauge, max across replicas)",
+                "runbook_url": "https://github.com/GutsButcher/treelink/blob/main/docs/INCIDENT-RESPONSE.md"
+              },
+              "data": [
+                {
+                  "refId": "A",
+                  "relativeTimeRange": {
+                    "from": 1800,
+                    "to": 0
+                  },
+                  "datasourceUid": "mimir",
+                  "model": {
+                    "expr": "max(treelink_integration_queue_due{job=\"treelink/treelink\"})",
+                    "instant": true,
+                    "refId": "A"
+                  }
+                },
+                {
+                  "refId": "C",
+                  "datasourceUid": "__expr__",
+                  "model": {
+                    "type": "threshold",
+                    "refId": "C",
+                    "expression": "A",
+                    "conditions": [
+                      {
+                        "evaluator": {
+                          "type": "gt",
+                          "params": [
+                            20
+                          ]
+                        }
+                      }
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "uid": "treelink-webhook-queue-growth",
+              "title": "TreelinkWebhookQueueGrowth",
+              "condition": "C",
+              "for": "30m",
+              "labels": {
+                "severity": "warning",
+                "service": "treelink"
+              },
+              "annotations": {
+                "summary": "Pending webhook deliveries grew by more than 100 over 30 minutes",
+                "runbook_url": "https://github.com/GutsButcher/treelink/blob/main/docs/INCIDENT-RESPONSE.md"
+              },
+              "data": [
+                {
+                  "refId": "A",
+                  "relativeTimeRange": {
+                    "from": 1800,
+                    "to": 0
+                  },
+                  "datasourceUid": "mimir",
+                  "model": {
+                    "expr": "max(treelink_integration_queue_depth{job=\"treelink/treelink\",state=\"pending\"}) - max(treelink_integration_queue_depth{job=\"treelink/treelink\",state=\"pending\"} offset 30m)",
+                    "instant": true,
+                    "refId": "A"
+                  }
+                },
+                {
+                  "refId": "C",
+                  "datasourceUid": "__expr__",
+                  "model": {
+                    "type": "threshold",
+                    "refId": "C",
+                    "expression": "A",
+                    "conditions": [
+                      {
+                        "evaluator": {
+                          "type": "gt",
+                          "params": [
+                            100
+                          ]
+                        }
+                      }
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "uid": "treelink-heartbeat-webhooks",
+              "title": "TreelinkHeartbeatStaleWebhooks",
+              "condition": "C",
+              "for": "5m",
+              "labels": {
+                "severity": "critical",
+                "service": "treelink"
+              },
+              "annotations": {
+                "summary": "The webhook delivery job has not run on any replica for 10 minutes (database heartbeat, not process memory). Label name to confirm against Mimir before wiring.",
+                "runbook_url": "https://github.com/GutsButcher/treelink/blob/main/docs/INCIDENT-RESPONSE.md"
+              },
+              "data": [
+                {
+                  "refId": "A",
+                  "relativeTimeRange": {
+                    "from": 1800,
+                    "to": 0
+                  },
+                  "datasourceUid": "mimir",
+                  "model": {
+                    "expr": "max(treelink_jobs_heartbeat_age_seconds{job=\"treelink/treelink\",job_name=\"webhooks\"})",
+                    "instant": true,
+                    "refId": "A"
+                  }
+                },
+                {
+                  "refId": "C",
+                  "datasourceUid": "__expr__",
+                  "model": {
+                    "type": "threshold",
+                    "refId": "C",
+                    "expression": "A",
+                    "conditions": [
+                      {
+                        "evaluator": {
+                          "type": "gt",
+                          "params": [
+                            600
+                          ]
+                        }
+                      }
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "uid": "treelink-heartbeat-maintenance",
+              "title": "TreelinkHeartbeatStaleMaintenance",
+              "condition": "C",
+              "for": "5m",
+              "labels": {
+                "severity": "warning",
+                "service": "treelink"
+              },
+              "annotations": {
+                "summary": "The maintenance job has not run on any replica for 13 hours (one missed 6 h run tolerated)",
+                "runbook_url": "https://github.com/GutsButcher/treelink/blob/main/docs/INCIDENT-RESPONSE.md"
+              },
+              "data": [
+                {
+                  "refId": "A",
+                  "relativeTimeRange": {
+                    "from": 1800,
+                    "to": 0
+                  },
+                  "datasourceUid": "mimir",
+                  "model": {
+                    "expr": "max(treelink_jobs_heartbeat_age_seconds{job=\"treelink/treelink\",job_name=\"maintenance\"})",
+                    "instant": true,
+                    "refId": "A"
+                  }
+                },
+                {
+                  "refId": "C",
+                  "datasourceUid": "__expr__",
+                  "model": {
+                    "type": "threshold",
+                    "refId": "C",
+                    "expression": "A",
+                    "conditions": [
+                      {
+                        "evaluator": {
+                          "type": "gt",
+                          "params": [
+                            46800
+                          ]
+                        }
+                      }
+                    ]
+                  }
+                }
+              ]
+            },
+            {
+              "uid": "treelink-webhook-latency",
+              "title": "TreelinkWebhookLatency",
+              "condition": "C",
+              "for": "15m",
+              "labels": {
+                "severity": "warning",
+                "service": "treelink"
+              },
+              "annotations": {
+                "summary": "Webhook attempt p95 above 5 s for 15 minutes (half the 10 s request timeout)",
+                "runbook_url": "https://github.com/GutsButcher/treelink/blob/main/docs/INCIDENT-RESPONSE.md"
+              },
+              "data": [
+                {
+                  "refId": "A",
+                  "relativeTimeRange": {
+                    "from": 1800,
+                    "to": 0
+                  },
+                  "datasourceUid": "mimir",
+                  "model": {
+                    "expr": "histogram_quantile(0.95, sum by (le) (rate(treelink_integration_attempt_duration_milliseconds_bucket{job=\"treelink/treelink\"}[15m])))",
+                    "instant": true,
+                    "refId": "A"
+                  }
+                },
+                {
+                  "refId": "C",
+                  "datasourceUid": "__expr__",
+                  "model": {
+                    "type": "threshold",
+                    "refId": "C",
+                    "expression": "A",
+                    "conditions": [
+                      {
+                        "evaluator": {
+                          "type": "gt",
+                          "params": [
+                            5000
+                          ]
+                        }
+                      }
+                    ]
+                  }
+                }
+              ]
             }
           ]
         }

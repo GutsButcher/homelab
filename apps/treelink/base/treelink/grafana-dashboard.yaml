@@ -15,8 +15,8 @@ data:
   treelink-overview.json: |
     {
       "uid": "treelink-overview",
-      "title": "Treelink \u2014 overview",
-      "description": "Request rate, errors, latency and Node.js runtime health for the production Treelink pod (OTel auto-instrumentation, job treelink/treelink).",
+      "title": "Treelink — overview",
+      "description": "Request rate, errors, latency and Node.js runtime health for the production Treelink pod (OTel auto-instrumentation, job treelink/treelink). Integrations row: ADR-N application metrics through the OTel meter (docs/OBSERVABILITY.md).",
       "tags": [
         "treelink"
       ],
@@ -293,6 +293,200 @@ data:
               "placement": "bottom"
             }
           }
+        },
+        {
+          "type": "row",
+          "title": "Integrations (ADR-N application metrics; docs/OBSERVABILITY.md)",
+          "collapsed": false,
+          "gridPos": {
+            "x": 0,
+            "y": 24,
+            "w": 24,
+            "h": 1
+          },
+          "panels": []
+        },
+        {
+          "type": "timeseries",
+          "title": "Webhook attempts / s by result",
+          "description": "Per-process counter summed across replicas.",
+          "gridPos": {
+            "x": 0,
+            "y": 25,
+            "w": 12,
+            "h": 8
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short"
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom"
+            },
+            "tooltip": {
+              "mode": "multi"
+            }
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "sum by (result) (rate(treelink_integration_attempts_total{job=\"treelink/treelink\"}[5m]))",
+              "legendFormat": "{{result}}",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "mimir"
+              }
+            }
+          ]
+        },
+        {
+          "type": "timeseries",
+          "title": "Webhook attempt latency p50 / p95",
+          "description": "",
+          "gridPos": {
+            "x": 12,
+            "y": 25,
+            "w": 12,
+            "h": 8
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "ms"
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom"
+            },
+            "tooltip": {
+              "mode": "multi"
+            }
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "histogram_quantile(0.5, sum by (le) (rate(treelink_integration_attempt_duration_milliseconds_bucket{job=\"treelink/treelink\"}[5m])))",
+              "legendFormat": "p50",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "mimir"
+              }
+            },
+            {
+              "refId": "B",
+              "expr": "histogram_quantile(0.95, sum by (le) (rate(treelink_integration_attempt_duration_milliseconds_bucket{job=\"treelink/treelink\"}[5m])))",
+              "legendFormat": "p95",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "mimir"
+              }
+            }
+          ]
+        },
+        {
+          "type": "timeseries",
+          "title": "Webhook queue depth by state (global, max across replicas)",
+          "description": "Global database gauge: every replica reports the same value; never sum it.",
+          "gridPos": {
+            "x": 0,
+            "y": 33,
+            "w": 12,
+            "h": 8
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short"
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom"
+            },
+            "tooltip": {
+              "mode": "multi"
+            }
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "max by (state) (treelink_integration_queue_depth{job=\"treelink/treelink\"})",
+              "legendFormat": "{{state}}",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "mimir"
+              }
+            },
+            {
+              "refId": "B",
+              "expr": "max(treelink_integration_queue_due{job=\"treelink/treelink\"})",
+              "legendFormat": "due now",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "mimir"
+              }
+            }
+          ]
+        },
+        {
+          "type": "timeseries",
+          "title": "Job heartbeat age (global, max across replicas)",
+          "description": "Seconds since the job last ran on any replica, read from job_heartbeats (global gauge, max across replicas).",
+          "gridPos": {
+            "x": 12,
+            "y": 33,
+            "w": 12,
+            "h": 8
+          },
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s"
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": {
+              "displayMode": "list",
+              "placement": "bottom"
+            },
+            "tooltip": {
+              "mode": "multi"
+            }
+          },
+          "targets": [
+            {
+              "refId": "A",
+              "expr": "max by (job_name) (treelink_jobs_heartbeat_age_seconds{job=\"treelink/treelink\"})",
+              "legendFormat": "{{job_name}}",
+              "datasource": {
+                "type": "prometheus",
+                "uid": "mimir"
+              }
+            }
+          ]
         }
       ]
     }
