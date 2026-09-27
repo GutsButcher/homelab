@@ -5,6 +5,7 @@ resources:
   - backup-s3-secret.yaml
   - cnpg.yaml
   - backup.yaml
+  - uploads-backup.yaml
   - uploads-pvc.yaml
   - instrumentation.yaml
   - deployment.yaml

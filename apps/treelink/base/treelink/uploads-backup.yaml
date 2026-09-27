@@ -1,0 +1,97 @@
+---
+# Nightly backup of the uploads PVC to RustFS (treelink docs/BACKUPS.md). The database has
+# PITR through CNPG; uploads (avatars, covers, block images, imported icons) live on a
+# local-path RWO volume and had no copy anywhere. rclone mirrors the directory into
+# s3://treelink-uploads/current; files removed or changed on the source are moved to
+# deleted/<date>/ and kept 14 days, matching the database retention window. Same root
+# credential as the database backup (SealedSecret treelink-backup-s3). The PV is bound to
+# one node, so the scheduler places this pod next to the app; both mount the RWO volume
+# on that node, read-only here.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: treelink-uploads-backup
+  namespace: treelink
+spec:
+  schedule: "40 2 * * *" # UTC, after the 02:10 database base backup
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  startingDeadlineSeconds: 3600
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      activeDeadlineSeconds: 1800
+      template:
+        metadata:
+          labels:
+            app: treelink-uploads-backup
+        spec:
+          restartPolicy: Never
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1001
+            runAsGroup: 1001
+            fsGroup: 1001
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: rclone
+              image: docker.io/rclone/rclone:1.68
+              imagePullPolicy: IfNotPresent
+              command: ["/bin/sh", "-ec"]
+              args:
+                - |
+                  day=$(date -u +%F)
+                  rclone mkdir s3:treelink-uploads
+                  rclone sync /data/uploads s3:treelink-uploads/current \
+                    --checksum --backup-dir "s3:treelink-uploads/deleted/$day" \
+                    --stats-one-line --stats 0 -v
+                  # Deleted/changed files are kept 14 days, like the database window.
+                  rclone delete s3:treelink-uploads/deleted --min-age 14d --rmdirs -v || true
+                  echo "backup complete: $(rclone size s3:treelink-uploads/current --json)"
+              env:
+                - name: RCLONE_CONFIG_S3_TYPE
+                  value: s3
+                - name: RCLONE_CONFIG_S3_PROVIDER
+                  value: Minio
+                - name: RCLONE_CONFIG_S3_ENDPOINT
+                  value: http://rustfs.rustfs.svc.cluster.local:9000
+                - name: RCLONE_CONFIG_S3_FORCE_PATH_STYLE
+                  value: "true"
+                - name: RCLONE_CONFIG_S3_ACCESS_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: treelink-backup-s3
+                      key: ACCESS_KEY_ID
+                - name: RCLONE_CONFIG_S3_SECRET_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: treelink-backup-s3
+                      key: ACCESS_SECRET_KEY
+                - name: RCLONE_CONFIG_DIR
+                  value: /tmp/rclone
+              volumeMounts:
+                - name: uploads
+                  mountPath: /data/uploads
+                  readOnly: true
+                - name: tmp
+                  mountPath: /tmp
+              resources:
+                requests:
+                  cpu: 50m
+                  memory: 64Mi
+                limits:
+                  memory: 256Mi
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: ["ALL"]
+          volumes:
+            - name: uploads
+              persistentVolumeClaim:
+                claimName: treelink-uploads
+                readOnly: true
+            - name: tmp
+              emptyDir: {}
