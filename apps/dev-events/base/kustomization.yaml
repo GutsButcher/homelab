@@ -1,0 +1,10 @@
+# Development-only RabbitMQ + Redis for the TreeLink microservices transition (treelink
+# docs/decisions/0003-microservices-transition.md, Phase 0 stage 2). NOT applied yet: waits for the
+# owner's placement decision (docs/microservices/phase-0.md, "asks"). Nothing in production uses it.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: dev-events
+resources:
+  - namespace.yaml
+  - rabbitmq.yaml
+  - redis.yaml
