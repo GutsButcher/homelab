@@ -100,18 +100,32 @@ spec:
               memory: 256Mi
             limits:
               memory: 768Mi
-          readinessProbe:
+          # Probe convention (TDR-0003 Phase 0, template for every service incl. media-service):
+          #   startup   /livez  process answers; covers boot-time migrations before liveness applies
+          #   liveness  /livez  process-only, never touches PostgreSQL/Redis/RabbitMQ, so a dependency
+          #                     outage can never restart the app in a loop
+          #   readiness /readyz database + configured dependencies; failing it only removes the pod
+          #                     from the Service (503 at the edge) until the dependency is back
+          startupProbe:
             httpGet:
-              path: /healthz
+              path: /livez
               port: http
-            initialDelaySeconds: 5
-            periodSeconds: 10
+            periodSeconds: 5
+            failureThreshold: 36 # up to 3 min for the boot-time migrations
           livenessProbe:
             httpGet:
-              path: /healthz
+              path: /livez
               port: http
-            initialDelaySeconds: 30
-            periodSeconds: 30
+            periodSeconds: 20
+            timeoutSeconds: 3
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
       volumes:
         - name: uploads
           persistentVolumeClaim:
