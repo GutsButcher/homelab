@@ -23,11 +23,15 @@ spec:
     spec:
       imagePullSecrets:
         - name: gitea-registry
+      # The web tier never talks to the Kubernetes API.
+      automountServiceAccountToken: false
       securityContext:
         runAsNonRoot: true
         runAsUser: 1001
         runAsGroup: 1001
         fsGroup: 1001
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: treelink
           # Tag is set in apps/treelink/prod/kustomization.yaml by scripts/release.sh
@@ -112,6 +116,12 @@ spec:
               memory: 256Mi
             limits:
               memory: 768Mi
+          # Restricted profile except the root filesystem: Next's standalone server writes its
+          # image-optimisation cache under .next; the uploads volume is the only intended write path.
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
           # Probe convention (TDR-0003 Phase 0, template for every service incl. media-service):
           #   startup   /livez  process answers; covers boot-time migrations before liveness applies
           #   liveness  /livez  process-only, never touches PostgreSQL/Redis/RabbitMQ, so a dependency
