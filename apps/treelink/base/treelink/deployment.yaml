@@ -93,6 +93,15 @@ spec:
                   optional: true
             - name: APP_URL
               value: https://treelink.gwynbliedd.com
+            # Field-encryption keyring (treelink docs/SECURITY.md § Key material and rotation):
+            # separate from SESSION_SECRET; rotated by prepending a key and letting maintenance
+            # re-encrypt. Optional so an image without the keyring still boots on the legacy key.
+            - name: ENCRYPTION_KEYS
+              valueFrom:
+                secretKeyRef:
+                  name: treelink-secrets
+                  key: ENCRYPTION_KEYS
+                  optional: true
             # Media service (TDR-0003 Phase 1). The web tier signs short-lived service tokens with
             # this key; which path is used is decided by the platform flags media_dual_write /
             # media_service (admin → flags), both off by default, so setting these changes nothing
