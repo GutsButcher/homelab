@@ -1,0 +1,94 @@
+---
+# Nightly copy of the media bucket (treelink docs/microservices/phase-1.md, docs/BACKUPS.md). Once
+# the media service is the primary backend, new uploads exist only in its bucket; this mirrors
+# the bucket into s3://treelink-uploads/media-current, keeping deleted or changed objects for
+# 14 days under media-deleted/<date>/, the same window as the volume backup it complements
+# (treelink-uploads-backup keeps running until the old path is removed). Bucket-to-bucket inside
+# RustFS with the backup credential; the media service's own key cannot read the backup bucket.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: treelink-media-backup
+  namespace: treelink
+spec:
+  schedule: "55 2 * * *" # after the volume backup (02:40)
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  startingDeadlineSeconds: 3600
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      activeDeadlineSeconds: 1800
+      template:
+        metadata:
+          labels:
+            app: treelink-media-backup
+        spec:
+          restartPolicy: Never
+          nodeSelector:
+            kubernetes.io/hostname: node01
+          automountServiceAccountToken: false
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1001
+            runAsGroup: 1001
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: rclone
+              image: docker.io/rclone/rclone:1.68
+              imagePullPolicy: IfNotPresent
+              command: ["/bin/sh", "-ec"]
+              args:
+                - |
+                  day=$(date -u +%F)
+                  rclone mkdir s3:treelink-uploads
+                  rclone sync "s3:$MEDIA_BUCKET" s3:treelink-uploads/media-current \
+                    --checksum --backup-dir "s3:treelink-uploads/media-deleted/$day" \
+                    --stats-one-line --stats 0 -v
+                  rclone delete s3:treelink-uploads/media-deleted --min-age 14d --rmdirs -v || true
+                  echo "media backup complete: $(rclone size s3:treelink-uploads/media-current --json)"
+              env:
+                - name: MEDIA_BUCKET
+                  valueFrom:
+                    secretKeyRef:
+                      name: treelink-media-secrets
+                      key: S3_BUCKET
+                - name: RCLONE_CONFIG_S3_TYPE
+                  value: s3
+                - name: RCLONE_CONFIG_S3_PROVIDER
+                  value: Minio
+                - name: RCLONE_CONFIG_S3_ENDPOINT
+                  value: http://rustfs.rustfs.svc.cluster.local:9000
+                - name: RCLONE_CONFIG_S3_FORCE_PATH_STYLE
+                  value: "true"
+                - name: RCLONE_CONFIG_S3_ACCESS_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: treelink-backup-s3
+                      key: ACCESS_KEY_ID
+                - name: RCLONE_CONFIG_S3_SECRET_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: treelink-backup-s3
+                      key: ACCESS_SECRET_KEY
+                - name: RCLONE_CONFIG_DIR
+                  value: /tmp/rclone
+              volumeMounts:
+                - name: tmp
+                  mountPath: /tmp
+              resources:
+                requests:
+                  cpu: 50m
+                  memory: 64Mi
+                limits:
+                  memory: 256Mi
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: ["ALL"]
+          volumes:
+            - name: tmp
+              emptyDir: {}

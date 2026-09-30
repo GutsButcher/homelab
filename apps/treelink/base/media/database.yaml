@@ -1,0 +1,18 @@
+---
+# The media service owns its own database (TDR-0003: database per service, one PostgreSQL
+# cluster). The role `treelink_media` is declared on the Cluster (../treelink/cnpg.yaml,
+# managed.roles) with its password from SealedSecret treelink-media-db; it owns only this
+# database and has no rights on the monolith's `treelink` database.
+apiVersion: postgresql.cnpg.io/v1
+kind: Database
+metadata:
+  name: treelink-media
+  namespace: treelink
+spec:
+  cluster:
+    name: treelink-db
+  name: treelink_media
+  owner: treelink_media
+  ensure: present
+  # Never drop the data when this object is removed from Git.
+  databaseReclaimPolicy: retain

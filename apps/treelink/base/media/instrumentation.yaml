@@ -1,0 +1,25 @@
+---
+# Same auto-instrumentation as the web tier, with the media service's own service name so its
+# series land under job="treelink/treelink-media" (metric contract: services/media/src/telemetry.ts).
+apiVersion: opentelemetry.io/v1alpha1
+kind: Instrumentation
+metadata:
+  name: nodejs-media
+  namespace: treelink
+spec:
+  exporter:
+    endpoint: http://alloy-gateway.monitoring.svc.cluster.local:4318
+  propagators:
+    - tracecontext
+    - baggage
+  sampler:
+    type: parentbased_traceidratio
+    argument: "0.5"
+  nodejs:
+    env:
+      - name: OTEL_SERVICE_NAME
+        value: treelink-media
+      - name: OTEL_NODE_DISABLED_INSTRUMENTATIONS
+        value: fs,dns,net
+      - name: OTEL_NODE_RESOURCE_DETECTORS
+        value: env,host,os,process,container

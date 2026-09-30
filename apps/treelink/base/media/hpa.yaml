@@ -1,0 +1,26 @@
+---
+# CPU-bound image work: scale on CPU. One replica normally; a second under sustained encoding
+# load. Periodic tasks and the relay are guarded by PostgreSQL advisory locks, so replicas never
+# run them twice. Upper bound kept at 2 on this two-node homelab (node01 memory).
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: treelink-media
+  namespace: treelink
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: treelink-media
+  minReplicas: 1
+  maxReplicas: 2
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300

@@ -17,6 +17,16 @@ spec:
     initdb:
       database: treelink
       owner: treelink
+  # Roles of the services that own their own database in this cluster (TDR-0003: database per
+  # service). The media service's database is declared in ../media/database.yaml.
+  managed:
+    roles:
+      - name: treelink_media
+        ensure: present
+        login: true
+        comment: media service (TDR-0003 Phase 1)
+        passwordSecret:
+          name: treelink-media-db
   storage:
     size: 5Gi
   # On-prem backups: base backups + WAL archive in RustFS (apps/rustfs, node01),

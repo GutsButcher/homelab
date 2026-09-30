@@ -1,0 +1,76 @@
+---
+# Run by hand (kubectl apply -f), never by Argo: see treelink docs/microservices/phase-1.md.
+# The uploads PVC is RWO on local-path: the Job runs on the node that holds it (node01, next to
+# the web pod) and mounts it read-only. Delete the Job after reading its log.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: treelink-media-backfill
+  namespace: treelink
+spec:
+  backoffLimit: 0
+  activeDeadlineSeconds: 3600
+  ttlSecondsAfterFinished: 604800
+  template:
+    metadata:
+      labels:
+        app: treelink-media-job
+        job: treelink-media-backfill
+    spec:
+      restartPolicy: Never
+      nodeSelector:
+        kubernetes.io/hostname: node01
+      automountServiceAccountToken: false
+      imagePullSecrets:
+        - name: gitea-registry
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        runAsGroup: 1001
+        fsGroup: 1001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: media
+          image: gitea.gwynbliedd.com/gwynbliedd/treelink-media:MEDIA_TAG
+          imagePullPolicy: IfNotPresent
+          args: ["backfill"]
+          command: ["node", "dist/main.cjs"]
+          env:
+            - name: RUN_MIGRATIONS
+              value: "false"
+            - name: MEDIA_LEGACY_UPLOAD_DIR
+              value: /legacy/uploads
+            - name: MEDIA_STORAGE
+              value: s3
+            - name: S3_ENDPOINT
+              value: http://rustfs.rustfs.svc.cluster.local:9000
+            - name: S3_FORCE_PATH_STYLE
+              value: "true"
+          envFrom:
+            - secretRef:
+                name: treelink-media-secrets
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              memory: 384Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: uploads
+              mountPath: /legacy/uploads
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: uploads
+          persistentVolumeClaim:
+            claimName: treelink-uploads
+            readOnly: true
+        - name: tmp
+          emptyDir: {}

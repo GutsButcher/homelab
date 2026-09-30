@@ -89,6 +89,18 @@ spec:
                   optional: true
             - name: APP_URL
               value: https://treelink.gwynbliedd.com
+            # Media service (TDR-0003 Phase 1). The web tier signs short-lived service tokens with
+            # this key; which path is used is decided by the platform flags media_dual_write /
+            # media_service (admin → flags), both off by default, so setting these changes nothing
+            # by itself. Removing them is the hard off switch.
+            - name: MEDIA_SERVICE_URL
+              value: http://treelink-media.treelink.svc.cluster.local:3100
+            - name: MEDIA_SERVICE_PRIVATE_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: treelink-media-client
+                  key: MEDIA_SERVICE_PRIVATE_KEY
+                  optional: true
             - name: UPLOAD_DIR
               value: /data/uploads
           volumeMounts:

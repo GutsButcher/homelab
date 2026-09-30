@@ -1,0 +1,90 @@
+---
+# Who may talk to the media service: only the web tier (which authenticates users and signs the
+# service tokens). Nothing else in the cluster reaches it; the public /u/ path goes through the
+# web tier. The kubelet's probes come from the node and are not subject to pod selectors.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: treelink-media-ingress
+  namespace: treelink
+spec:
+  podSelector:
+    matchLabels:
+      app: treelink-media
+  policyTypes: ["Ingress"]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: treelink
+      ports:
+        - protocol: TCP
+          port: 3100
+---
+# What the media service may reach: DNS, its database, object storage, the telemetry gateway.
+# It never fetches remote content (imports are fetched by the web tier's guarded transport and
+# handed over as bytes), so there is no route to the internet or to other namespaces.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: treelink-media-egress
+  namespace: treelink
+spec:
+  # The service and its hand-run migration Jobs (backfill, verify, export).
+  podSelector:
+    matchExpressions:
+      - key: app
+        operator: In
+        values: ["treelink-media", "treelink-media-job"]
+  policyTypes: ["Egress"]
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    - to:
+        - podSelector:
+            matchLabels:
+              cnpg.io/cluster: treelink-db
+      ports:
+        - protocol: TCP
+          port: 5432
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: rustfs
+          podSelector:
+            matchLabels:
+              app: rustfs
+      ports:
+        - protocol: TCP
+          port: 9000
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - protocol: TCP
+          port: 4318
+        - protocol: TCP
+          port: 4317
+---
+# The migration Jobs accept no connections at all.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: treelink-media-job-ingress
+  namespace: treelink
+spec:
+  podSelector:
+    matchLabels:
+      app: treelink-media-job
+  policyTypes: ["Ingress"]

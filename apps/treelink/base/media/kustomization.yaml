@@ -1,0 +1,13 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+# Media service (treelink TDR-0003 Phase 1). The Jobs in ./jobs are NOT listed here: backfill,
+# verify and export are run by hand at the migration steps (treelink docs/microservices/phase-1.md).
+resources:
+  - secrets.yaml
+  - database.yaml
+  - instrumentation.yaml
+  - deployment.yaml
+  - service.yaml
+  - hpa.yaml
+  - networkpolicy.yaml
+  - media-backup.yaml

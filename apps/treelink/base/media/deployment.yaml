@@ -1,0 +1,127 @@
+---
+# Media service: uploads, re-encoding, variants, serving, orphan sweep; the only holder of the
+# media bucket key. Stateless (object storage + its own database), so it rolls and scales freely.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: treelink-media
+  namespace: treelink
+  labels:
+    app: treelink-media
+spec:
+  # replicas is owned by the HPA (hpa.yaml).
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: treelink-media
+  template:
+    metadata:
+      labels:
+        app: treelink-media
+      annotations:
+        instrumentation.opentelemetry.io/inject-nodejs: "nodejs-media"
+    spec:
+      # Next to RustFS and the web tier; keeps image pulls off the control-plane node's disk.
+      nodeSelector:
+        kubernetes.io/hostname: node01
+      automountServiceAccountToken: false
+      imagePullSecrets:
+        - name: gitea-registry
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        runAsGroup: 1001
+        fsGroup: 1001
+        seccompProfile:
+          type: RuntimeDefault
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: media
+          # Tag is set in apps/treelink/prod/kustomization.yaml (same commit tag as the web image).
+          image: gitea.gwynbliedd.com/gwynbliedd/treelink-media:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 3100
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: treelink-media-secrets
+                  key: DATABASE_URL
+            - name: MEDIA_STORAGE
+              value: s3
+            - name: S3_ENDPOINT
+              value: http://rustfs.rustfs.svc.cluster.local:9000
+            - name: S3_REGION
+              value: us-east-1
+            - name: S3_FORCE_PATH_STYLE
+              value: "true"
+            - name: S3_BUCKET
+              valueFrom:
+                secretKeyRef:
+                  name: treelink-media-secrets
+                  key: S3_BUCKET
+            - name: S3_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: treelink-media-secrets
+                  key: S3_ACCESS_KEY_ID
+            - name: S3_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: treelink-media-secrets
+                  key: S3_SECRET_ACCESS_KEY
+            # Public half of the web tier's signing key: the service can verify tokens, never mint them.
+            - name: SERVICE_JWT_PUBLIC_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: treelink-media-secrets
+                  key: SERVICE_JWT_PUBLIC_KEY
+            # No broker in this cluster (stage 2 deferred): references arrive by the web tier's
+            # hourly full sync; RABBITMQ_URL stays unset.
+          resources:
+            # sharp encodes are CPU-bound; one pod handles the homelab's volume, the HPA adds a
+            # second under sustained load. No CPU limit (throttling would stretch encodes).
+            requests:
+              cpu: 100m
+              memory: 192Mi
+            limits:
+              memory: 512Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+          # Probe convention of TDR-0003 Phase 0 (same as the web tier).
+          startupProbe:
+            httpGet:
+              path: /livez
+              port: http
+            periodSeconds: 5
+            failureThreshold: 36
+          livenessProbe:
+            httpGet:
+              path: /livez
+              port: http
+            periodSeconds: 20
+            timeoutSeconds: 3
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 256Mi
