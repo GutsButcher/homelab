@@ -19,7 +19,7 @@ spec:
       labels:
         app: treelink
       annotations:
-        instrumentation.opentelemetry.io/inject-nodejs: "true"
+        instrumentation.opentelemetry.io/inject-nodejs: "nodejs" # named: two Instrumentation CRs live in the namespace since the media service (a bare "true" makes the operator refuse to pick one)
     spec:
       imagePullSecrets:
         - name: gitea-registry
