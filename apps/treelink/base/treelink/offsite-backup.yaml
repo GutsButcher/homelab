@@ -1,0 +1,148 @@
+---
+# T-15/E4: off-site copy of the backup bucket (docs/BACKUPS.md: "no off-site copy" is an open
+# blocker in docs/PRODUCTION-READINESS.md §1 "Backup / PITR / DR"). Today both the database
+# backup (RustFS, node01) and its only consumer live in this one homelab; losing the site loses
+# both. This mirrors s3://treelink-db/ (the barman bucket) to a remote S3-compatible target, the
+# same rclone bucket-to-bucket shape already used for apps/treelink/base/media/media-backup.yaml.
+#
+# Options considered (documented, not decided — this is the owner's call, D-11):
+#   - Backblaze B2 (S3-compatible API): cheapest per-GB of the three, no egress fee for the first
+#     3x stored volume per month, simplest to script with rclone (type=s3, provider=Other or a
+#     native b2 remote). Recommended default below.
+#   - Cloudflare R2: zero egress fee outright, S3-compatible; marginally more expensive to store
+#     than B2 at this scale, and ties another credential to the Cloudflare account already
+#     fronting treelink.gwynbliedd.com.
+#   - A second physical site (e.g. a relative's hardware, or another on-prem box) running its own
+#     RustFS/MinIO and reachable over a WireGuard tunnel: no recurring cost, but it is new
+#     infrastructure to build and keep patched, not just a bucket to point rclone at — the
+#     highest-effort option of the three.
+# None of these has been provisioned. The CronJob below is wired for "a generic S3-compatible
+# endpoint" and ships `suspend: true` with placeholder credentials (SealedSecret
+# treelink-offsite-s3, ACCESS_KEY_ID/SECRET_ACCESS_KEY/ENDPOINT/BUCKET all literal placeholder
+# text, sealed the same way as backup-s3-scoped-secret.yaml — see that file's header for the
+# kubeseal command). Un-suspend only after: picking one option, provisioning the bucket, and
+# resealing this Secret with real values.
+apiVersion: bitnami.com/v1alpha1
+kind: SealedSecret
+metadata:
+  name: treelink-offsite-s3
+  namespace: treelink
+spec:
+  encryptedData:
+    ACCESS_KEY_ID: AgA+jH9nlwwFVHAKJfQxhooPve6KZy5wKWAvFdXU1iAluS5fvmW8wrlxgybuJTqCuGBNNkMqN1n8qiiSjjF3xPfc/JilgxE8QGmx5JCX/HPftpwIjliYx8TdXD/mejMNz5qgpxlz951LJKYFRQDacjxGrZ/RkIoKZ7Rt6VVzVpTvBq6Hb5ETLIm8+/SCqy3az0eQwwatLayAonatphjMvBFuL/vdRI+HRs0YWeIaKn7xdugPLoYBp+yqRzfce7XFh++siU2QrTy2RoE2d+0CNqVP2Z/YG6vErOJK4WDcKMYB+E1dGRcVun3ebISR4pbnDZgtfrkhSH8PTXe160Znhc6zuIMNszvje+5RruiE4aq89aIGR1y84Tlo5YkOVQvCftWBoayOcG3AkP9kp6hbrJMahC7YHWlE9gy0Emx01BwDm7BFE1Q9YNSwbb0J5pVSHcEaILtofLDzzobR7AGhcX4pTQDea3H5bCtYo912uT1v6g89aj+sQVGDhv4vEoZzmSOThbVYs1TTW9ANB7XkjVOGrmAO9zjZOSY8bg3M37nt4uVnB2qNJ464p6g3aH5Dp6im/U4WZlHCCN3zAd2kppwuy8m/B7B1Vi1AceuMJNiCcjoqhjP2CVxH4eM1KQM4NydiAt4pUsQnhalAcj5s/JHZ8ygJHKIxE0FPU0pbGhGaj1dV73eMN4Yl9pMyfhvyIR8Cs0kOhUAxdVGHFMRrQhy/ke9OU+ksIl+X54o4zavKyDwbny7cUQ==
+    BUCKET: AgAXBffqX9W2e9s6Lap74bMDtnPZB45LQ0zFxz1n67JQymnkldnfLnSySz+ju+IcTxxOeDkzePtbr47SW4reJQSx0mwachnjhmjz4hnJ7wtL5e61Cz9vyn0P+Knk6bS3pCkSKbKoocZG//jc6rgd4emZZzUiocmi5vPj638mc1YzP62dcXqA8qlHGVMCjQdBlMRNMmq5qejchYWhxsCT2RP1rpEPy5xRokGCF3NsTk/7/RRLAd22BegUMjZMfYsvE+dunPA4/TZS2MBroMyjDRNYKPAUzpdWi+RkcCSJGYLpGBBa0u8l2drhcBEOgXbCA9o0Ns8KV+7HE5dkFmYybk1L9glPX5CsTdwmTK1M3KhZ0gMwHTYgmRdKH0HdTxEObXPLSygVtcXIrOo7CksfkOTvvjRkPTTn3+0LGsmKz/8QH7jhbBxwAfttNnvIbLb7+JGM3jGwPmHDGpbw8mPej+U4WbMYSfeOovKR27s2QBkSqhW8ZjaWSItXa8UZKHhZuz6GAA25Q7mmFWFMkqLP3DjqxgJUgtIqxA2j9S2wGFvBOM6w85HtR8CPpNcN+PO61/cBZvQeW8EFlaiaZzKTZ744AzPu0jYt55ZPxRClpa4fK5INLO1q/6Z7Ia5f0WXrEENQ//AB53vfvJAFXTpGgRzDAhfsU18/nGvRLtwuPfSmR97zIxr0v+8dVMQVZRhylio71W0FQp4ZYTytlct9Lu8pbhPjZmt6ady36vcT69E0HzjSUAo=
+    ENDPOINT: AgAOD+rzQjQDVOlF30Pz/oLcPzh8aiV+CPVomrVNFoJ9OdiE8eGuRQWFuvnJ1D3X25Vt49GlyFpsPP4EXek1CEPWmlsmCu2edcx63iLw/IrgoeFckZGpN9jiz0hg9frWrM45sqtSXOPaqdEszvybzbjzKiAxM91qqYtdcp12eXVCQoLNFlBlbXWKMDShZBllX/7c5bD1x3YS2D+PTog5TGcp3RKRps++WzNdZEIogztGfqaDGU8mFhJE23SaEuVy2n/Ws9SGkvxlGfjj2ds6GI/0oytXtV+qbYzWfHH05FHtCPzjrR5QQE98RCU2JN7HC3KtqxVQgKFesZSbogcvNsAO1Ov+zQf+yWfw4kx2kFQTXAnoHWI9S5A9N20b6eEz5F5ftVBhajp0MNObLsmz60fJgbCEhWt5ks/Vw0QArO4KxL9PvRjvTacXbLS4UOdCwJ9xn76EsH0isGeWjFv9LSnlEwVlG+0dOVO3o9p7GpQBbN3XYH32WFzWruu9Ump00P2lS9OTNBkBfcB/+8/sW3BG+CTa9wWOi5pUXtSLU91I145OK1OE6Sp5Rv75lfEGDz3WbiqNNBlUu7GFgLzeCtwCJWI30LTYWW/xvUBrPsbZolKiipi4OIHjA6V/ssYBiMup5oG1NWL3TXf1MnvkCMSwCFFhX737PdOVCy8e0rPg39pWKdt96NUQTCidHkRwRdkXdDDgE7PrFve8BVN4B+Vzb4S7379wqRu7pm6D/B40oMnqi+7QLXr7Oqvy1iDu9m7qjBtY/49z
+    SECRET_ACCESS_KEY: AgCGwEJ0WplZxbg2VUgXlKQaaPAfglBTN6+0BHl3KSj5OmbnzsOoll24gshIrQW90GUPtfesgDuuvpTQZLLg2JO5Q4uhwC/Y5IubWdUkbmSEJCgaaLrO5xAo8nTZwe6s1897/mDpZPWXOk5qnyjjou2uuvk6g0ShCHItqPVobzeDQ3UdTA6y06muElEUPb+6rMq7BSQgReuuQuFRgkSa2peHe5VJof85Ov2vFHHctoZ29btDol/W53kYAdhDEqkKrFL8bLUPVG+25/k8gSi72KtTbC160cZf08qmfqmSaGJqiVnOYte1/GRpeP+uStN3/Jn4Dtl0HL5jQTBPkMYMBZaehp13t2RTzIuK107uNCJ5O+x8FqJp0oC991NLiB5NQm4EDqClODS1d501VOTrZ4H2ri82zA/U1X7dANKZtdZnQQR6ZmdsrC9rMkfJYB5fFtWNJjVUt16d/Pcivbc2LB9bFxOvki/OUQjjYaBCDwFBJjj2coHMWbrpWPzOsAvIfaDWte4Weuk/N9E11ytsmbWLeglEzkXUjR74hgTU/D59XlaXHT3aStCU8UJfNOHMKUx3nSqBY9/Y0dgm5F0IEWIzSsyIpM6xQakVM1IExZob9/6bw2tTvdPqQztn5kaP8yn7wHMHIZ//JiS0ic0/PgysG2YPqmqLUYuE7MSjnR8t57/Z/BdEy18/NTN+mdy2InwfSL4HsMJny6TAp3vNR7C9zcDzeMIQeVUDhgQR5FVYPaHbyk/MEw==
+  template:
+    metadata:
+      name: treelink-offsite-s3
+      namespace: treelink
+---
+# Suspended by default — the owner enables it only after picking an off-site provider above and
+# resealing treelink-offsite-s3 with real values. Runs after the on-prem backup chain completes
+# (02:10 base backup, 02:40 uploads, 02:55 media) so it mirrors a store that already has the
+# night's data; "current" always means "what RustFS has", never a direct DB read, so this job
+# never touches treelink-db or the app.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: treelink-db-offsite-backup
+  namespace: treelink
+spec:
+  schedule: "10 3 * * *"
+  suspend: true
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  startingDeadlineSeconds: 3600
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      activeDeadlineSeconds: 3600
+      template:
+        metadata:
+          labels:
+            app: treelink-db-offsite-backup
+        spec:
+          restartPolicy: Never
+          automountServiceAccountToken: false
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1001
+            runAsGroup: 1001
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: rclone
+              image: docker.io/rclone/rclone:1.68
+              imagePullPolicy: IfNotPresent
+              command: ["/bin/sh", "-ec"]
+              args:
+                - |
+                  rclone sync s3:treelink-db offsite:"$OFFSITE_BUCKET" \
+                    --checksum --stats-one-line --stats 0 -v
+                  echo "offsite backup complete: $(rclone size offsite:"$OFFSITE_BUCKET" --json)"
+              env:
+                - name: RCLONE_CONFIG_S3_TYPE
+                  value: s3
+                - name: RCLONE_CONFIG_S3_PROVIDER
+                  value: Minio
+                - name: RCLONE_CONFIG_S3_ENDPOINT
+                  value: http://rustfs.rustfs.svc.cluster.local:9000
+                - name: RCLONE_CONFIG_S3_FORCE_PATH_STYLE
+                  value: "true"
+                - name: RCLONE_CONFIG_S3_ACCESS_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: treelink-backup-s3-scoped
+                      key: ACCESS_KEY_ID
+                - name: RCLONE_CONFIG_S3_SECRET_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: treelink-backup-s3-scoped
+                      key: ACCESS_SECRET_KEY
+                # The off-site remote: generic S3-compatible (works for Backblaze B2's S3 API,
+                # Cloudflare R2, or a second RustFS/MinIO) once ENDPOINT/BUCKET/keys are real.
+                - name: RCLONE_CONFIG_OFFSITE_TYPE
+                  value: s3
+                - name: RCLONE_CONFIG_OFFSITE_PROVIDER
+                  value: Other
+                - name: RCLONE_CONFIG_OFFSITE_ENDPOINT
+                  valueFrom:
+                    secretKeyRef:
+                      name: treelink-offsite-s3
+                      key: ENDPOINT
+                - name: RCLONE_CONFIG_OFFSITE_ACCESS_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: treelink-offsite-s3
+                      key: ACCESS_KEY_ID
+                - name: RCLONE_CONFIG_OFFSITE_SECRET_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: treelink-offsite-s3
+                      key: SECRET_ACCESS_KEY
+                - name: OFFSITE_BUCKET
+                  valueFrom:
+                    secretKeyRef:
+                      name: treelink-offsite-s3
+                      key: BUCKET
+                - name: RCLONE_CONFIG_DIR
+                  value: /tmp/rclone
+              volumeMounts:
+                - name: tmp
+                  mountPath: /tmp
+              resources:
+                requests:
+                  cpu: 50m
+                  memory: 64Mi
+                limits:
+                  memory: 256Mi
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: ["ALL"]
+          volumes:
+            - name: tmp
+              emptyDir: {}
