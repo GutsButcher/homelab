@@ -24,6 +24,11 @@ spec:
       - name: treelink_media
         ensure: present
         login: true
+        # Declared explicitly: CNPG 1.26 defaults these two fields on the stored role and
+        # spec.managed.roles is a whole-list field, so Argo CD compared git != live forever
+        # (OutOfSync + a self-heal re-apply every ~5 min). Same values as live → applying is a no-op.
+        connectionLimit: -1
+        inherit: true
         comment: media service (TDR-0003 Phase 1)
         passwordSecret:
           name: treelink-media-db
