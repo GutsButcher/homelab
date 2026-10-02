@@ -1,0 +1,28 @@
+# Staging: small size per TDR-0003 §G ("Staging (cloud, small sizes, same manifests as Production
+# with an overlay)"). One instance is enough to rehearse migrations and the backup/restore drill;
+# it is NOT HA — that is deliberate, Production below is where instances: 2 matters.
+#
+# `pg_hba: hostssl ... reject` style enforcement of TLS, and the backup object-store target, are
+# OWNER FILLS (apps/treelink/envs/README.md): the exact pg_hba syntax CNPG expects should be
+# re-checked against the CNPG operator version actually installed on the new cluster before this
+# is applied (`kubectl explain cluster.spec.postgresql.pg_hba` once the CRD is installed) — this is
+# a reasonable default, not a verified one.
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: treelink-db
+spec:
+  instances: 1
+  postgresql:
+    pg_hba:
+      # Reject any connection that did not negotiate TLS. The app's DATABASE_URL must therefore
+      # carry sslmode=require (patch-web-db-url-env.yaml in the hardening component) or it cannot
+      # connect at all — a loud failure instead of a silent plaintext connection.
+      - hostssl all all all scram-sha-256
+      - hostnossl all all all reject
+  backup:
+    barmanObjectStore:
+      # REPLACE_ME: staging's own bucket on the production object-storage provider (never reuse
+      # the production database's backup bucket/credential).
+      destinationPath: s3://REPLACE_ME-treelink-db-staging/
+      endpointURL: https://REPLACE_ME-object-storage-endpoint

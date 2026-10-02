@@ -1,0 +1,25 @@
+# Production: instances: 2 for HA, as required by the task brief and TDR-0003 §F ("managed
+# PostgreSQL 17 HA with PITR"). This Cluster resource models a CNPG-operated Postgres; if the
+# owner's D-16 decision is a cloud-managed Postgres (RDS/Cloud SQL/etc.) instead of CNPG-on-k8s,
+# this whole file is replaced by that provider's Terraform/manifest and the app only needs the
+# resulting connection string in treelink-db-url (db-url-secret.yaml) — the rest of this overlay
+# (web/media Deployments, NetworkPolicies, HPAs) does not change either way.
+#
+# Same caveat as staging: re-check `pg_hba` syntax against the installed CNPG operator version
+# before applying.
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: treelink-db
+spec:
+  instances: 2
+  postgresql:
+    pg_hba:
+      - hostssl all all all scram-sha-256
+      - hostnossl all all all reject
+  backup:
+    barmanObjectStore:
+      # REPLACE_ME: production's own bucket, a separate credential from staging's and from the
+      # homelab's (apps/treelink/envs/README.md, "owner fills" row "S3").
+      destinationPath: s3://REPLACE_ME-treelink-db-production/
+      endpointURL: https://REPLACE_ME-object-storage-endpoint

@@ -1,0 +1,45 @@
+---
+# Option B — Cloudflare-proxied DNS to a cloud load balancer in front of an in-cluster Ingress
+# controller (commented out of kustomization.yaml; swap with ingress-cloudflare-tunnel.yaml there
+# to use this instead — pick ONE, see ../README.md "Ingress: tunnel vs. load balancer").
+#
+# Assumes an Ingress controller (ingress-nginx, or a cloud-managed one) and cert-manager are
+# already part of the new cluster's bootstrap (docs/infra/production-provisioning.md step
+# "cluster bootstrap") — neither is created here. docs/CLOUDFLARE-PRODUCTION.md "Origin protection"
+# still applies: the load balancer/firewall in front of the Ingress controller must allow only
+# Cloudflare's published IP ranges (a cloud firewall rule, not a Kubernetes object, so it is not
+# modelled here) or Authenticated Origin Pulls must be configured on the controller.
+#
+# PLACEHOLDER: the hostname must match patch-hostnames.yaml's APP_URL and the Cloudflare DNS
+# record (owner fills: ../README.md row "zone"). `ingressClassName` and the cert-manager issuer
+# name depend on what the cluster bootstrap installs — REPLACE_ME both.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: treelink
+  namespace: treelink
+  annotations:
+    cert-manager.io/cluster-issuer: "REPLACE_ME" # e.g. letsencrypt-prod, once cert-manager is installed
+spec:
+  ingressClassName: REPLACE_ME # e.g. nginx
+  tls:
+    - hosts:
+        - REPLACE_ME-staging.example.com
+      secretName: treelink-tls
+  rules:
+    - host: REPLACE_ME-staging.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: treelink
+                port:
+                  number: 3000
+# For ../_components/hardening/networkpolicy-web.yaml's ingress rule to admit traffic forwarded by
+# this controller, label whichever namespace the Ingress controller's pods run in (typically its
+# own, e.g. `ingress-nginx`, not `treelink`):
+#   kubectl label namespace <ingress-controller-namespace> treelink.io/edge-ingress=allow
+# Not done here as a manifest because it is a label on a Namespace this overlay does not own or
+# create (the cluster bootstrap does); it is a one-time `kubectl label`, not GitOps state.

@@ -1,0 +1,28 @@
+# CNPG's auto-generated `treelink-db-app` secret (key `uri`) does not include `sslmode=require` —
+# its `uri` key is a bare `postgresql://user:pass@host:5432/dbname`. docs/ENVIRONMENTS.md and
+# docs/PRODUCTION-READINESS.md §3 both call a database connection without TLS a MEDIUM finding to
+# close before production. Rather than trust every client to pass sslmode itself, the provisioning
+# runbook (docs/infra/production-provisioning.md in the treelink repo) also sets the CNPG cluster's
+# `pg_hba` to `hostssl`-only (patch-cnpg.yaml in each env), which makes the server refuse a
+# plaintext connection outright — so the connection string MUST ask for TLS or the app cannot boot
+# at all, which is the point: a silently-plaintext production database is worse than a loud failure.
+#
+# `treelink-db-url` is a placeholder Secret (REPLACE_ME) in each env directory. The runbook fills
+# it for real once CNPG has created `treelink-db-app`: take that secret's host/user/password/dbname
+# and build `postgres://<user>:<password>@<host>:5432/<dbname>?sslmode=require`, then reseal
+# `treelink-db-url` with the real value for this cluster. See apps/treelink/envs/README.md.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: treelink
+spec:
+  template:
+    spec:
+      containers:
+        - name: treelink
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: treelink-db-url
+                  key: DATABASE_URL

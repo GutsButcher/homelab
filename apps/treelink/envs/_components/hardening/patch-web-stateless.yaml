@@ -1,0 +1,68 @@
+# Strategic-merge patch on Deployment/treelink (apps/treelink/base/treelink/deployment.yaml).
+#
+# The base Deployment is shaped for the homelab dev tier: one replica, Recreate strategy, an RWO
+# "uploads" PVC mounted at /data/uploads, and a writable root filesystem (comment in the base file:
+# "Next's standalone server writes its image-optimisation cache under .next"). None of that is
+# right for staging/production:
+#
+#   - By the time this overlay is used, TDR-0003 Phase 1 (media service) is the only upload path in
+#     production — there is no legacy volume to mount. If this infrastructure is provisioned BEFORE
+#     the media cutover is final for good, add the uploads PVC and volume mount back (copy them from
+#     apps/treelink/base/treelink/deployment.yaml and uploads-pvc.yaml) and keep the web tier at
+#     replicas: 1 / strategy: Recreate until it is retired, exactly like the dev tier.
+#   - Without that RWO volume the web tier is stateless and can run >1 replica, which is what lets
+#     the HPA (hpa-web.yaml in this component) and the PDB (pdb-web.yaml) mean anything.
+#   - `readOnlyRootFilesystem: true` needs somewhere for Next's standalone server to write. Verified
+#     from the treelink repo: the Dockerfile sets WORKDIR /app and does NOT copy `.next/cache` into
+#     the image (only `.next/standalone` and `.next/static`), so Next (de)compresses/writes its
+#     runtime cache — the built-in image-optimization cache under `.next/cache/images`, since
+#     next.config.ts does not set `images.unoptimized` — relative to that cwd, i.e. `/app/.next/cache`;
+#     sharp/Node's temp files go to `/tmp` (`os.tmpdir()`). Both become emptyDir mounts below. The
+#     app itself writes nothing else to disk: uploads go through the media service, and there is no
+#     ISR/`use cache` (CLAUDE.md: "the app relies on request-time rendering").
+#
+# `spec.replicas` is intentionally left as the base's `1` rather than removed: Kustomize strategic
+# merge cannot "unset" a scalar field, and the HPA (hpa-web.yaml) takes over scaling once Argo CD
+# has created the Deployment once. The example Argo CD Applications in ../../argocd add
+# `ignoreDifferences` on `spec/replicas` for this Deployment so the HPA and Argo's selfHeal do not
+# fight each other — see the comment there before wiring this up for real.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: treelink
+spec:
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  template:
+    spec:
+      volumes:
+        - name: uploads
+          $patch: delete
+        - name: tmp
+          emptyDir: {}
+        - name: next-cache
+          emptyDir: {}
+      containers:
+        - name: treelink
+          env:
+            # Legacy local-volume upload path; nothing mounts it once the uploads volume above is
+            # removed, and it would be the one thing left trying to write outside /tmp and
+            # /app/.next/cache under readOnlyRootFilesystem. Harmless to leave (unused once
+            # media_service is on) but removed for clarity.
+            - name: UPLOAD_DIR
+              $patch: delete
+          volumeMounts:
+            - name: uploads
+              $patch: delete
+            - name: tmp
+              mountPath: /tmp
+            - name: next-cache
+              mountPath: /app/.next/cache
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]

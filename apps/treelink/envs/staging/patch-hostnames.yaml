@@ -1,0 +1,16 @@
+# REPLACE_ME: the staging hostname (apps/treelink/envs/README.md, "owner fills" row "zone"). Must
+# match whichever of ingress-cloudflare-tunnel.yaml / ingress-loadbalancer.yaml is kept in
+# kustomization.yaml, and the Cloudflare Turnstile widget's registered hostname
+# (docs/CLOUDFLARE-PRODUCTION.md).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: treelink
+spec:
+  template:
+    spec:
+      containers:
+        - name: treelink
+          env:
+            - name: APP_URL
+              value: https://REPLACE_ME-staging.example.com
