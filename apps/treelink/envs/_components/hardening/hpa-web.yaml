@@ -1,0 +1,30 @@
+---
+# TDR-0003 §F describes web as "stateless; HPA on RPS". There is no request-rate metric adapter
+# (Prometheus Adapter / KEDA) assumed to exist in this skeleton, so this starts on CPU like the
+# media service's HPA (apps/treelink/base/media/hpa.yaml) — the same metric the dev tier already
+# has evidence for (docs/DEPLOYMENT.md Grafana dashboard: request rate, latency, event-loop delay).
+# Switch to a custom RPS metric once a metrics adapter is chosen (TDR-0003 §H "Optional later").
+# minReplicas 2 matches TDR-0003 §F ("min 2 replicas each in Production"); staging overlays it down
+# to 1 via patch-staging-sizing.yaml to save cost — see that file.
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: treelink
+  namespace: treelink
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: treelink
+  minReplicas: 2
+  maxReplicas: 6
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300

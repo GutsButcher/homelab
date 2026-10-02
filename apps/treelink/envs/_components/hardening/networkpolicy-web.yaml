@@ -1,0 +1,104 @@
+---
+# NEW web-tier NetworkPolicy (docs/PRODUCTION-READINESS.md §3: "a NetworkPolicy for the web tier"
+# is listed as still open; the dev tier only has one for the media service,
+# apps/treelink/base/media/networkpolicy.yaml, whose comment this one follows). Kubelet probes are
+# not filtered by pod-selector NetworkPolicy rules in the CNIs this cluster already relies on for
+# that same statement on the media policy, so no explicit "allow from node" rule is needed here.
+#
+# Egress is intentionally broader than the media service's: the web tier is still the monolith
+# (TDR-0003 Phases 2-5 have not run), so it is also today's only holder of the safety module
+# (outbound link-safety fetches and redirect tracing, src/lib/safe-fetch.ts), the mail sender, the
+# webhook delivery worker, OAuth/Turnstile/Web Risk calls, and the billing provider's API — all of
+# which reach arbitrary third-party hosts. Narrow this once TDR-0003 Phase 4 (safety) and Phase 2
+# (integrations/notifications) extract those responsibilities into services that get their own,
+# tighter egress policies (TDR-0003 §B: "network policies restrict egress to those two [safety and
+# media]").
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: treelink-web-ingress
+  namespace: treelink
+spec:
+  podSelector:
+    matchLabels:
+      app: treelink
+  policyTypes: ["Ingress"]
+  ingress:
+    # Owner fills: label the namespace that hosts the chosen edge (cloudflared, or the
+    # ingress-controller/Gateway namespace — see ../staging/ingress-*.yaml and
+    # ../production/ingress-*.yaml for the two options) with
+    # `kubectl label namespace <edge-ns> treelink.io/edge-ingress=allow`.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              treelink.io/edge-ingress: "allow"
+      ports:
+        - protocol: TCP
+          port: 3000
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: treelink-web-egress
+  namespace: treelink
+spec:
+  podSelector:
+    matchLabels:
+      app: treelink
+  policyTypes: ["Egress"]
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    - to:
+        - podSelector:
+            matchLabels:
+              cnpg.io/cluster: treelink-db
+      ports:
+        - protocol: TCP
+          port: 5432
+    - to:
+        - podSelector:
+            matchLabels:
+              app: treelink-media
+      ports:
+        - protocol: TCP
+          port: 3100
+    # Self-hosted observability backend, if that is the owner's D-16 choice (docs/infra/
+    # production-provisioning.md, "Where production observability lives"). A managed backend
+    # (Grafana Cloud or similar) is reached over the open internet rule below instead.
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - protocol: TCP
+          port: 4317
+        - protocol: TCP
+          port: 4318
+    # Arbitrary third-party hosts: link-safety fetches/redirect tracing, outbound mail (SMTP
+    # relay), webhook deliveries, OAuth/Turnstile/Web Risk/billing-provider APIs, and the
+    # production object-storage endpoint if it is not reachable through the cluster-internal rule
+    # above. Restricting this further means extracting safety/integrations/notifications first
+    # (TDR-0003 Phases 2 and 4) and is tracked there, not here.
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 80
+        - protocol: TCP
+          port: 465 # SMTPS
+        - protocol: TCP
+          port: 587 # SMTP STARTTLS

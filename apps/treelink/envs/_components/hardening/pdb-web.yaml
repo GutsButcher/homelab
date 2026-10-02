@@ -1,0 +1,13 @@
+---
+# Without this, Argo CD/cluster-autoscaler node drains or a voluntary eviction could take every
+# web replica down at once. TDR-0003 §F: "services with HPA (min 2 replicas each in Production)".
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: treelink
+  namespace: treelink
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: treelink

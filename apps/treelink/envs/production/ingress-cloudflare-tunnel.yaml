@@ -1,0 +1,78 @@
+---
+# Option A — Cloudflare Tunnel. See ../staging/ingress-cloudflare-tunnel.yaml for the full
+# explanation; this is production's own tunnel, its own token, pointed at the production hostname
+# (patch-hostnames.yaml). Never reuse staging's tunnel token here.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: treelink-cloudflare-tunnel
+  namespace: treelink
+  labels:
+    treelink.io/placeholder: "true"
+type: Opaque
+stringData:
+  TUNNEL_TOKEN: "REPLACE_ME"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cloudflared
+  namespace: treelink
+  labels:
+    app: cloudflared
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: cloudflared
+  template:
+    metadata:
+      labels:
+        app: cloudflared
+        treelink.io/edge-ingress: "allow"
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: cloudflared
+          image: docker.io/cloudflare/cloudflared:2025.9.0
+          imagePullPolicy: IfNotPresent
+          args: ["tunnel", "--no-autoupdate", "run"]
+          env:
+            - name: TUNNEL_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: treelink-cloudflare-tunnel
+                  key: TUNNEL_TOKEN
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              memory: 256Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          livenessProbe:
+            httpGet:
+              path: /ready
+              port: 2000
+            periodSeconds: 10
+            failureThreshold: 3
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: cloudflared
+  namespace: treelink
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: cloudflared
