@@ -41,6 +41,16 @@ meant to work. Only sizing, secrets, networking and the image reference differ p
 
 ## Design decisions this skeleton makes (and the one it deliberately does not)
 
+- **The web-tier HPA's `minReplicas: 2` is a target state, not a fact about the app today.**
+  `_components/hardening/hpa-web.yaml` is written for the state TDR-0003 assumes production
+  eventually reaches. As of this writing the treelink repo's own `CLAUDE.md` states: "the web tier
+  is a single replica by design until Redis, the legacy path's removal and a queue land" — the
+  in-memory rate limiter and the in-process job scheduler do not coordinate correctly across
+  replicas without `RATE_LIMIT_STORE=redis`, and the legacy local-upload code path must be fully
+  retired first. **Before this overlay is ever synced, check both preconditions against the actual
+  commit being deployed** (`docs/LAUNCH-GATES.md` Section A in the treelink repo) and patch
+  `minReplicas` back to 1 here if either is false. This is called out again, loudly, in the file
+  itself.
 - **One cluster or two?** This skeleton assumes staging and production are **separate clusters**
   (the Argo CD `Application` examples in `argocd/` each have their own `destination.server`), both
   using the namespace `treelink` — so nothing in `base/` or the hardening component needs a

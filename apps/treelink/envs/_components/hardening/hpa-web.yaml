@@ -6,6 +6,17 @@
 # Switch to a custom RPS metric once a metrics adapter is chosen (TDR-0003 §H "Optional later").
 # minReplicas 2 matches TDR-0003 §F ("min 2 replicas each in Production"); staging overlays it down
 # to 1 via patch-staging-sizing.yaml to save cost — see that file.
+#
+# DO NOT SYNC THIS AT minReplicas > 1 UNTIL BOTH ARE TRUE (treelink docs/LAUNCH-GATES.md, Section
+# A): (1) RATE_LIMIT_STORE=redis is configured and reachable — the in-memory rate limiter and the
+# in-process job scheduler (src/lib/jobs.ts) do not coordinate across replicas without it; and (2)
+# the legacy local-upload code path is fully removed (the Phase 1 final-verify PR,
+# docs/microservices/phase-1.md). The treelink repo's own CLAUDE.md states this as a correctness
+# requirement, not a tuning note: "the web tier is a single replica by design until Redis, the
+# legacy path's removal and a queue land." This manifest is written for the state TDR-0003 assumes
+# production eventually reaches, not for whatever state the app happens to be in on the day this
+# infrastructure is first provisioned — check both preconditions against the actual deployed
+# commit before applying this file, and patch minReplicas back to 1 here if either is false yet.
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
