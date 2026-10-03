@@ -59,11 +59,14 @@ spec:
             - name: DOCKER_HOST
               value: unix:///var/run/docker.sock
           securityContext:
-            allowPrivilegeEscalation: false
+            # The runner itself stays an unprivileged container (uid runner, seccomp
+            # RuntimeDefault), but Playwright's `--with-deps` step needs `sudo apt-get` inside it
+            # (first self-hosted run 37098980158: "sudo: The 'no new privileges' flag is set"),
+            # so privilege escalation is allowed and the default capability set is kept (dpkg
+            # needs CAP_CHOWN/DAC_OVERRIDE). The real blast radius is the privileged dind
+            # sidecar next to it, documented above; this does not widen it.
             seccompProfile:
               type: RuntimeDefault
-            capabilities:
-              drop: ["ALL"]
           resources:
             # Sized against node01's measured headroom (4 vCPU / ~15.9Gi allocatable; ~68%/62%
             # of cpu/memory already requested by other workloads at measurement time — see the
