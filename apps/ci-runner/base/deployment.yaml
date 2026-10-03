@@ -58,6 +58,13 @@ spec:
                   key: RUNNER_TOKEN
             - name: DOCKER_HOST
               value: unix:///var/run/docker.sock
+            # npm's cache defaults to ~/.npm, which is container-local and lost on every pod
+            # restart; ~/.cache is the PVC (see volumeMounts), so the npm cache lives there too.
+            # Job steps inherit the runner process's environment, and treelink's ci.yml no longer
+            # restores GitHub's remote npm cache on self-hosted runners (its PR #106), so this is
+            # what makes `npm ci` warm across restarts.
+            - name: NPM_CONFIG_CACHE
+              value: /home/runner/.cache/npm
           securityContext:
             # The runner itself stays an unprivileged container (uid runner, seccomp
             # RuntimeDefault), but Playwright's `--with-deps` step needs `sudo apt-get` inside it
