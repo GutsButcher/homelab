@@ -59,6 +59,9 @@ data:
     set -e
     dockerd-entrypoint.sh &
     pid=$!
+    # Forward SIGTERM to dockerd so the pod stops within seconds instead of sitting in
+    # Terminating until terminationGracePeriodSeconds (1800 s) expires.
+    trap 'kill -TERM "$pid" 2>/dev/null' TERM INT
     echo "ci-runner-dind: waiting for the docker socket..."
     for i in $(seq 1 60); do
       [ -S /var/run/docker.sock ] && break
