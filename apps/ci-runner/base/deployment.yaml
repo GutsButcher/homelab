@@ -1,0 +1,133 @@
+# Self-hosted GitHub Actions runner for the private repo GutsButcher/treelink (owner-approved;
+# GitHub-hosted minutes are exhausted — see apps/ci-runner/README.md). Not --ephemeral: this is
+# a persistent runner that registers once and keeps running, named homelab-node01-1, matching
+# the labels treelink's CI_RUNNER_LABELS repo variable will point at
+# (self-hosted,linux,x64,homelab).
+#
+# Two containers sharing one pod:
+#   - runner: the actions-runner itself (GitHub's official image).
+#   - dind: a privileged Docker-in-Docker sidecar, because the workflow's `services:` containers,
+#     `docker build`/buildx steps, the semgrep `container:` job and `docker run` all need a real
+#     Docker daemon. This is the biggest risk in this PR — see the PR description, "Privileged
+#     dind: risk and why it is acceptable here".
+#
+# Known gap (documented, not fixed by this PR): the official actions-runner image has no sudo/
+# apt available to a non-root user, so `playwright install --with-deps` cannot run here.
+# treelink PR #105 (ci/runner-switch) already works around this by only using --with-deps on
+# GitHub-hosted and running plain `playwright install chromium` (no OS deps) on self-hosted. The
+# OS dependencies for Chromium are not pre-installed in this image; a future custom runner image
+# built in CI is the real fix, and is out of scope here — the owner decides when to prioritize it.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ci-runner
+  namespace: ci-runner
+  labels:
+    app: ci-runner
+spec:
+  replicas: 1
+  # Recreate, not RollingUpdate: the PVC is ReadWriteOnce and the runner's identity
+  # (homelab-node01-1) must never exist as two pods at once.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: ci-runner
+  template:
+    metadata:
+      labels:
+        app: ci-runner
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: node01
+      serviceAccountName: ci-runner
+      automountServiceAccountToken: false
+      # Longest job in the pipeline today (measurement.yml's full suite) comfortably fits inside
+      # 30 minutes; this gives an in-flight job time to finish a graceful shutdown instead of
+      # being killed mid-job on a pod replacement.
+      terminationGracePeriodSeconds: 1800
+      containers:
+        - name: runner
+          image: ghcr.io/actions/actions-runner:2.337.0
+          command: ["/bin/bash", "/ci-runner/runner-entrypoint.sh"]
+          env:
+            - name: RUNNER_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: ci-runner-registration
+                  key: RUNNER_TOKEN
+            - name: DOCKER_HOST
+              value: unix:///var/run/docker.sock
+          securityContext:
+            allowPrivilegeEscalation: false
+            seccompProfile:
+              type: RuntimeDefault
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            # Sized against node01's measured headroom (4 vCPU / ~15.9Gi allocatable; ~68%/62%
+            # of cpu/memory already requested by other workloads at measurement time — see the
+            # PR description for the exact numbers). Requests are deliberately below the
+            # originally proposed 1 cpu / 3Gi to leave a safety margin on an already tight node;
+            # limits are generous for a CI burst (build + test + Playwright all at once).
+            requests:
+              cpu: 600m
+              memory: 3Gi
+            limits:
+              cpu: 3
+              memory: 6Gi
+          volumeMounts:
+            - name: entrypoints
+              mountPath: /ci-runner
+              readOnly: true
+            - name: var-run
+              mountPath: /var/run
+            - name: data
+              mountPath: /home/runner/_work
+              subPath: work
+            - name: data
+              mountPath: /home/runner/.cache
+              subPath: cache
+        - name: dind
+          image: docker:29.8.2-dind
+          command: ["/bin/sh", "/ci-runner/dind-entrypoint.sh"]
+          env:
+            - name: DOCKER_TLS_CERTDIR
+              value: ""
+          securityContext:
+            # The documented risk of this PR: dockerd needs to manage its own containers,
+            # networks and cgroups, which requires privileged mode on a sidecar like this (no
+            # narrower capability set is sufficient for a general-purpose Docker daemon). See
+            # the PR description.
+            privileged: true
+          resources:
+            requests:
+              cpu: 250m
+              memory: 1Gi
+            limits:
+              cpu: 1
+              memory: 2Gi
+          volumeMounts:
+            - name: entrypoints
+              mountPath: /ci-runner
+              readOnly: true
+            - name: var-run
+              mountPath: /var/run
+            # Mounted at the same path as in the runner container so that any workflow step
+            # that bind-mounts a workspace path into a `docker run`/`docker build` resolves to
+            # the same files from dockerd's point of view (dockerd and the runner process are in
+            # different filesystem namespaces otherwise). No step does this today, but the next
+            # one that tries would otherwise fail in a confusing way.
+            - name: data
+              mountPath: /home/runner/_work
+              subPath: work
+      volumes:
+        - name: entrypoints
+          configMap:
+            name: ci-runner-entrypoints
+            defaultMode: 0o555
+        - name: var-run
+          emptyDir: {}
+        - name: data
+          persistentVolumeClaim:
+            claimName: ci-runner-data

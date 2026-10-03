@@ -1,0 +1,61 @@
+# Ingress: nothing talks to this pod (no service fronts it), so there is no ingress rule at all
+# — an empty `ingress: []` with policyTypes ["Ingress"] denies everything, including other pods
+# in this namespace. Egress: DNS, the open internet on 80/443 (GitHub, ghcr.io, Docker Hub, npm,
+# Sigstore for cosign's keyless OIDC flow, etc.), and the in-cluster Gitea registry directly
+# (gitea.gwynbliedd.com resolves back into this same cluster; routing to it in-cluster avoids a
+# hairpin through the external load balancer). This does not scope the 80/443 rule away from
+# cluster-internal IP ranges (acceptable for a single CI pod on a single-tenant development-tier
+# cluster; see the PR description).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ci-runner-ingress
+  namespace: ci-runner
+spec:
+  podSelector:
+    matchLabels:
+      app: ci-runner
+  policyTypes: ["Ingress"]
+  ingress: []
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ci-runner-egress
+  namespace: ci-runner
+spec:
+  podSelector:
+    matchLabels:
+      app: ci-runner
+  policyTypes: ["Egress"]
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: gitea
+          podSelector:
+            matchLabels:
+              app: gitea
+      ports:
+        - protocol: TCP
+          port: 3000
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+      ports:
+        - protocol: TCP
+          port: 80
+        - protocol: TCP
+          port: 443

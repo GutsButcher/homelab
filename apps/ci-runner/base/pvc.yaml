@@ -1,0 +1,16 @@
+# Backs the runner's _work (job checkouts) and the npm/Playwright cache, plus the runner's own
+# registration state (_work/.runner-state — see entrypoint-configmap.yaml) so a pod restart does
+# not need a fresh registration token. local-path is this cluster's default class; its
+# WaitForFirstConsumer binding mode is fine here because the pod is already pinned to node01.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ci-runner-data
+  namespace: ci-runner
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 20Gi
