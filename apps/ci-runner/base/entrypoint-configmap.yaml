@@ -1,0 +1,73 @@
+# Two small shell entrypoints, kept out of the Deployment spec for readability.
+#
+# runner-entrypoint.sh: registers the runner on first boot only. Registration state
+# (.runner/.credentials*) is symlinked onto the _work PVC mount (subdir .runner-state) so it
+# survives pod restarts — the registration token expires in 1h and GitHub does not hand out a
+# fresh one automatically, so the runner must not need one after the first successful run.
+#
+# dind-entrypoint.sh: starts dockerd, then opens the shared docker.sock to the sibling runner
+# container. The dind sidecar and the runner container are different filesystem namespaces, so
+# the socket (created root:root 0660 by dockerd) is chmod'd 0666 on the shared emptyDir — the
+# runner container's non-root user has no other way to reach it. This does not widen the actual
+# blast radius: anything that can already reach a Docker socket on a privileged dind sidecar has
+# root-equivalent access to the node via that socket regardless of its file mode.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ci-runner-entrypoints
+  namespace: ci-runner
+data:
+  runner-entrypoint.sh: |
+    #!/bin/bash
+    set -euo pipefail
+    cd /home/runner
+
+    STATE_DIR="_work/.runner-state"
+    mkdir -p "$STATE_DIR"
+
+    # Re-link any persisted registration state from a previous pod's run before checking it.
+    for f in .runner .credentials .credentials_rsaparams .service; do
+      if [ -f "$STATE_DIR/$f" ] && [ ! -e "$f" ]; then
+        ln -s "$(pwd)/$STATE_DIR/$f" "$f"
+      fi
+    done
+
+    if [ ! -e .runner ]; then
+      echo "ci-runner: no registration found on the PVC; registering homelab-node01-1"
+      ./config.sh --unattended \
+        --url https://github.com/GutsButcher/treelink \
+        --token "${RUNNER_TOKEN:?RUNNER_TOKEN is required for first-time registration}" \
+        --labels self-hosted,linux,x64,homelab \
+        --name homelab-node01-1 \
+        --replace
+
+      # Move the freshly written state onto the PVC and replace it with a symlink so it
+      # persists across restarts without needing a new token every time.
+      for f in .runner .credentials .credentials_rsaparams; do
+        if [ -f "$f" ] && [ ! -L "$f" ]; then
+          mv "$f" "$STATE_DIR/$f"
+          ln -s "$(pwd)/$STATE_DIR/$f" "$f"
+        fi
+      done
+    else
+      echo "ci-runner: existing registration found on the PVC; skipping config.sh"
+    fi
+
+    exec ./run.sh
+  dind-entrypoint.sh: |
+    #!/bin/sh
+    set -e
+    dockerd-entrypoint.sh &
+    pid=$!
+    echo "ci-runner-dind: waiting for the docker socket..."
+    for i in $(seq 1 60); do
+      [ -S /var/run/docker.sock ] && break
+      sleep 1
+    done
+    if [ -S /var/run/docker.sock ]; then
+      chmod 666 /var/run/docker.sock
+      echo "ci-runner-dind: socket ready and shared with the runner container"
+    else
+      echo "ci-runner-dind: docker socket never appeared" >&2
+    fi
+    wait "$pid"
