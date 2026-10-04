@@ -387,7 +387,17 @@ spec:
                     esac
                     echo "cleanup: deleting Cluster/$name and PVC/${name}-1 (always runs: success, failure, or signal)"
                     kubectl -n "$ns" delete cluster "$name" --ignore-not-found --wait=false || true
-                    kubectl -n "$ns" delete pvc "${name}-1" --ignore-not-found || true
+                    # --wait=false here too: the Role grants get/delete on this one PVC by name but
+                    # cannot grant list/watch (not resourceName-scoped), and `kubectl delete` without
+                    # --wait=false watches the object until it is gone — first manual run
+                    # (2026-10-04) PASSED the check but then hung in exactly that watch until the
+                    # Job deadline. The delete call itself succeeds; confirm disappearance by polling
+                    # the named get (allowed) for up to 2 minutes instead.
+                    kubectl -n "$ns" delete pvc "${name}-1" --ignore-not-found --wait=false || true
+                    for _ in $(seq 1 24); do
+                      kubectl -n "$ns" get pvc "${name}-1" >/dev/null 2>&1 || { echo "cleanup: PVC/${name}-1 gone"; break; }
+                      sleep 5
+                    done
                   }
                   trap cleanup EXIT
 
