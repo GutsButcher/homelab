@@ -7,6 +7,8 @@ resources:
   - backup.yaml
   - uploads-backup.yaml
   - uploads-pvc.yaml
+  # Wave 3 W3-7 (T-08 remainder): proposed weekly restore check, ships suspend: true (D-11).
+  - restore-check.yaml
   - instrumentation.yaml
   - deployment.yaml
   - service.yaml
