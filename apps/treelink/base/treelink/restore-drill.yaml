@@ -1,0 +1,256 @@
+---
+# T-15/E4: turn the manual/by-hand restore drill (treelink docs/BACKUPS.md "Automated drills",
+# scripts/infra/restore-drill.sh, run from the control-plane host today) into a scheduled,
+# in-cluster CronJob. SUSPENDED BY DEFAULT — see the note at the bottom before un-suspending.
+#
+# This does NOT run scripts/infra/restore-drill.sh itself: that script lives in the treelink git
+# repository, and no image this cluster runs (including gitea.gwynbliedd.com/gwynbliedd/treelink,
+# the web image — the Dockerfile copies only .next/standalone, .next/static, public, drizzle and
+# src/assets, never scripts/) contains it. The args below reimplement the same three steps
+# (render the recovery Cluster from the same template shape as
+# scripts/infra/restore-drill/cluster.yaml.tmpl, wait for healthy, row-count check against the
+# live primary, always delete on exit) as inline shell, using a generic kubectl-capable image
+# instead. This is a deliberate duplication, not a convenience — the two copies (this file and
+# the treelink repo's template/script) WILL drift if one changes without the other; there is no
+# way to have Kustomize pull a file out of a separate private git repo at render time. Keeping
+# them in sync is a process note for both repos, not something this PR can enforce.
+#
+# What this run does NOT do that the manual script does: write docs/infra/baselines/*.log or a
+# row to docs/BACKUPS.md's "Drill record" table (a CronJob cannot commit to a git repository).
+# Its evidence is the Job's own stdout (`kubectl -n treelink logs job/<name>`); the owner (or an
+# agent) still copies that into both treelink-repo locations by hand afterward, same as the
+# existing manual-run instructions already describe.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: treelink-restore-drill
+  namespace: treelink
+automountServiceAccountToken: true
+---
+# RBAC note (read before trusting this as "safe to run unattended"): Kubernetes RBAC has no
+# concept of "any name starting with X" — `resourceNames` only matches exact, pre-existing names.
+# scripts/infra/restore-drill.sh's own `--name` prefix guard (any name must start with
+# treelink-db-drill) is application logic, not an access-control boundary; it is not reproduced
+# here as RBAC because it cannot be. What IS scoped by resourceNames below, because the CronJob
+# always uses the same fixed names (no `--name`-equivalent override exists in this version):
+#   - get/watch on Cluster objects: only treelink-db (read-only health check) and
+#     treelink-db-drill (the drill cluster itself) — this role can never read, let alone touch,
+#     any other Cluster in the namespace.
+#   - delete/patch/update on Cluster: only treelink-db-drill. treelink-db is NEVER deletable or
+#     patchable by this role.
+#   - get/delete on the PVC: only treelink-db-drill-1 (CNPG's instance-1 PVC naming convention).
+#   - get + pods/exec create: only treelink-db-1 (read-only row counts off the live primary) and
+#     treelink-db-drill-1 (the drill's own pod). This role cannot exec into the web pod, the media
+#     pod, or any other pod in the namespace.
+# What is NOT scoped, because RBAC's `create` verb has no object to attach a resourceName to
+# before it exists: `create` on Cluster objects is namespace-wide. A leaked token for this
+# ServiceAccount could therefore create an arbitrarily-named Cluster (consuming storage, pulling
+# whatever imageName it specifies) but could not read, modify, or delete anything it created
+# beyond treelink-db-drill, nor touch treelink-db. This residual gap is inherent to Kubernetes
+# RBAC, not an oversight in this manifest; closing it fully would need an admission policy
+# (Kyverno/OPA Gatekeeper, neither installed in this cluster), out of scope here.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: treelink-restore-drill
+  namespace: treelink
+rules:
+  - apiGroups: ["postgresql.cnpg.io"]
+    resources: ["clusters"]
+    verbs: ["get", "watch"]
+    resourceNames: ["treelink-db", "treelink-db-drill"]
+  - apiGroups: ["postgresql.cnpg.io"]
+    resources: ["clusters"]
+    verbs: ["create"] # cannot be resourceName-scoped; see note above
+  - apiGroups: ["postgresql.cnpg.io"]
+    resources: ["clusters"]
+    verbs: ["delete", "patch", "update"]
+    resourceNames: ["treelink-db-drill"]
+  - apiGroups: [""]
+    resources: ["persistentvolumeclaims"]
+    verbs: ["get", "delete"]
+    resourceNames: ["treelink-db-drill-1"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get"]
+    resourceNames: ["treelink-db-1", "treelink-db-drill-1"]
+  - apiGroups: [""]
+    resources: ["pods/exec"]
+    verbs: ["create"]
+    resourceNames: ["treelink-db-1", "treelink-db-drill-1"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: treelink-restore-drill
+  namespace: treelink
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: treelink-restore-drill
+subjects:
+  - kind: ServiceAccount
+    name: treelink-restore-drill
+    namespace: treelink
+---
+# NOT independently verified: that docker.io/bitnami/kubectl:1.34 exists at this tag, pulls, runs
+# as a non-root uid by default, and ships bash + GNU date/coreutils (the inline script below
+# uses `date -u -d '-10 minutes'`, a GNU coreutils flag, and `trap ... EXIT`). No image pull was
+# attempted (forbidden in this task). The owner should dry-run this once by hand
+# (`kubectl create job -n treelink --from=cronjob/treelink-db-restore-drill drill-test`) before
+# relying on the nightly schedule, independent of `suspend: true` already defaulting it off.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: treelink-db-restore-drill
+  namespace: treelink
+spec:
+  schedule: "15 3 * * *" # after the 02:10 base backup and well clear of uploads(02:40)/media(02:55)
+  suspend: true # the owner's go per change (D-11): this spins up a second full CNPG instance
+  # (2Gi storage, its own pod) nightly on a 2-node cluster where the control-plane node's NVMe
+  # has a known history of stalling under write load (docs/ENGINEERING-LOG.md,
+  # docs/infra/nvme-remediation.md in the treelink repo) — advisory in the development tier
+  # today, but still real I/O this job adds on top of the existing nightly backup chain
+  # (02:10 base backup, 02:40 uploads mirror, 02:55 media mirror). Weigh that before flipping
+  # suspend to false, and consider whether this should instead run on node01 only (no
+  # nodeSelector is set below; CNPG's own pod placement, not this Job, decides where the drill
+  # instance actually lands).
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  startingDeadlineSeconds: 3600
+  jobTemplate:
+    spec:
+      backoffLimit: 0 # a failed drill should surface immediately, not retry and mask a flaky run
+      activeDeadlineSeconds: 900
+      template:
+        metadata:
+          labels:
+            app: treelink-db-restore-drill
+        spec:
+          restartPolicy: Never
+          serviceAccountName: treelink-restore-drill
+          automountServiceAccountToken: true
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1001
+            runAsGroup: 1001
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: restore-drill
+              image: docker.io/bitnami/kubectl:1.34
+              command: ["/bin/bash", "-c"]
+              env:
+                - name: HOME
+                  value: /tmp
+              args:
+                - |
+                  set -euo pipefail
+                  ns=treelink
+                  name=treelink-db-drill
+                  target_time="$(date -u -d '-10 minutes' '+%Y-%m-%d %H:%M:%S+00')"
+                  echo "restore drill (in-cluster CronJob) start: name=$name target_time=$target_time"
+
+                  kubectl -n "$ns" get cluster treelink-db >/dev/null
+                  prod_phase="$(kubectl -n "$ns" get cluster treelink-db -o jsonpath='{.status.phase}')"
+                  if [ "$prod_phase" != "Cluster in healthy state" ]; then
+                    echo "ABORT: production cluster treelink-db is not healthy (phase: $prod_phase)"; exit 1
+                  fi
+                  echo "preflight: production treelink-db is healthy"
+
+                  if kubectl -n "$ns" get cluster "$name" >/dev/null 2>&1; then
+                    echo "ABORT: $name already exists (a previous run may not have cleaned up, or one is running concurrently)"; exit 1
+                  fi
+
+                  cleanup() {
+                    echo "cleanup: deleting Cluster/$name (always runs)"
+                    kubectl -n "$ns" delete cluster "$name" --ignore-not-found --wait=false || true
+                    kubectl -n "$ns" delete pvc "${name}-1" --ignore-not-found || true
+                  }
+                  trap cleanup EXIT
+
+                  cat <<YAML | kubectl apply -f -
+                  apiVersion: postgresql.cnpg.io/v1
+                  kind: Cluster
+                  metadata:
+                    name: $name
+                    namespace: $ns
+                    labels:
+                      app.kubernetes.io/part-of: treelink-restore-drill
+                  spec:
+                    instances: 1
+                    imageName: ghcr.io/cloudnative-pg/postgresql:17.5
+                    storage:
+                      size: 2Gi
+                    bootstrap:
+                      recovery:
+                        source: treelink-db-source
+                        recoveryTarget:
+                          targetTime: "$target_time"
+                    externalClusters:
+                      - name: treelink-db-source
+                        barmanObjectStore:
+                          destinationPath: s3://treelink-db/
+                          endpointURL: http://rustfs.rustfs.svc.cluster.local:9000
+                          s3Credentials:
+                            accessKeyId:
+                              name: treelink-backup-s3-scoped
+                              key: ACCESS_KEY_ID
+                            secretAccessKey:
+                              name: treelink-backup-s3-scoped
+                              key: ACCESS_SECRET_KEY
+                          wal:
+                            compression: gzip
+                  YAML
+                  echo "applied: Cluster/$name"
+
+                  echo "waiting up to 600s for Cluster/$name to report healthy"
+                  start=$(date +%s)
+                  healthy=0
+                  phase="unknown"
+                  while [ $(( $(date +%s) - start )) -lt 600 ]; do
+                    phase="$(kubectl -n "$ns" get cluster "$name" -o jsonpath='{.status.phase}' 2>/dev/null || true)"
+                    if [ "$phase" = "Cluster in healthy state" ]; then healthy=1; break; fi
+                    sleep 5
+                  done
+                  rto=$(( $(date +%s) - start ))
+                  if [ "$healthy" != 1 ]; then
+                    echo "FAIL: not healthy after ${rto}s (last phase: $phase)"; exit 1
+                  fi
+                  echo "RTO: healthy after ${rto}s"
+
+                  echo "verifying row counts (drill vs live primary treelink-db-1)"
+                  fail=0
+                  for table in users pages blocks events; do
+                    live="$(kubectl -n "$ns" exec treelink-db-1 -c postgres -- psql -U postgres -d treelink -tAc "select count(*) from $table" 2>/dev/null | tr -d '[:space:]' || echo ERROR)"
+                    drill="$(kubectl -n "$ns" exec "${name}-1" -c postgres -- psql -U postgres -d treelink -tAc "select count(*) from $table" 2>/dev/null | tr -d '[:space:]' || echo ERROR)"
+                    echo "  $table: live=$live drill=$drill"
+                    [ "$drill" = ERROR ] && fail=1
+                    [ "$live" = ERROR ] && fail=1
+                  done
+
+                  result=PASS
+                  [ "$fail" = 0 ] || result=FAIL
+                  echo "restore drill RESULT: $result (RTO ${rto}s; target_time=$target_time)"
+                  echo "evidence: copy this job's log (kubectl -n $ns logs job/<job-name>) into"
+                  echo "docs/infra/baselines/ and add a row to docs/BACKUPS.md's Drill record table (treelink repo, by hand)."
+                  exit "$fail"
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 128Mi
+                limits:
+                  memory: 256Mi
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: ["ALL"]
+              volumeMounts:
+                - name: tmp
+                  mountPath: /tmp
+          volumes:
+            - name: tmp
+              emptyDir:
+                sizeLimit: 64Mi
