@@ -119,16 +119,29 @@ spec:
           volumeMounts:
             - name: uploads
               mountPath: /data/uploads
+            # Full restricted profile (E2 remainder): the standalone server's own image-
+            # optimisation cache is next/dist/server/image-optimizer.js's cacheDir, which is
+            # always `${distDir}/cache/images`; distDir defaults to `.next` and WORKDIR is /app
+            # (Dockerfile), so the real path is /app/.next/cache, not a config choice. Everything
+            # else under /app (server.js, .next/static, public, drizzle, src/assets) is baked into
+            # the image and never written at runtime. /tmp is mounted too because Node itself (and
+            # any transitive dependency) may use it (os.tmpdir()) even though no app code under
+            # src/lib does today.
+            - name: tmp
+              mountPath: /tmp
+            - name: next-cache
+              mountPath: /app/.next/cache
           resources:
             requests:
               cpu: 100m
               memory: 256Mi
             limits:
               memory: 768Mi
-          # Restricted profile except the root filesystem: Next's standalone server writes its
-          # image-optimisation cache under .next; the uploads volume is the only intended write path.
+          # Fully restricted profile: root filesystem is read-only; the only writable paths are
+          # the uploads volume and the two emptyDirs above.
           securityContext:
             allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
             capabilities:
               drop: ["ALL"]
           # Probe convention (TDR-0003 Phase 0, template for every service incl. media-service):
@@ -161,3 +174,9 @@ spec:
         - name: uploads
           persistentVolumeClaim:
             claimName: treelink-uploads
+        - name: tmp
+          emptyDir:
+            sizeLimit: 64Mi
+        - name: next-cache
+          emptyDir:
+            sizeLimit: 256Mi

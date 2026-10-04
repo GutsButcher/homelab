@@ -1,0 +1,149 @@
+---
+# Web tier NetworkPolicy (E2 remainder, docs/PRODUCTION-READINESS.md §3 "Container" finding).
+# Precedent: apps/treelink/base/media/networkpolicy.yaml already does this for the media service,
+# including the comment this policy reuses verbatim — "The kubelet's probes come from the node
+# and are not subject to pod selectors" — which is why no ingress rule is needed for the /livez,
+# /readyz and /livez startup probes: they already work today against the media pods under an
+# ingress-restrictive NetworkPolicy, on the same cluster, so the same is true here.
+#
+# What is NOT restricted here, and why: the treelink namespace has no other NetworkPolicy
+# covering it before this change (verified live, 2026-10-03: `kubectl -n treelink get
+# networkpolicy` listed only the three treelink-media-* policies), so this is the first time the
+# web pod's traffic becomes default-deny in either direction.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: treelink-web-ingress
+  namespace: treelink
+spec:
+  podSelector:
+    matchLabels:
+      app: treelink
+  policyTypes: ["Ingress"]
+  ingress:
+    # Only Traefik (the in-cluster ingress controller the IngressRoute binds to) reaches the
+    # pod's HTTP port. Nothing else in the cluster has a reason to call the web tier directly.
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: traefik
+      ports:
+        - protocol: TCP
+          port: 3000
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: treelink-web-egress
+  namespace: treelink
+spec:
+  podSelector:
+    matchLabels:
+      app: treelink
+  policyTypes: ["Egress"]
+  egress:
+    # DNS. Same rule as the media service's egress policy.
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # CNPG primary (DATABASE_URL). In-namespace, selected the same way CNPG labels every pod of
+    # the cluster.
+    - to:
+        - podSelector:
+            matchLabels:
+              cnpg.io/cluster: treelink-db
+      ports:
+        - protocol: TCP
+          port: 5432
+    # The media service (MEDIA_SERVICE_URL), in-namespace.
+    - to:
+        - podSelector:
+            matchLabels:
+              app: treelink-media
+      ports:
+        - protocol: TCP
+          port: 3100
+    # MailHog, the SMTP test sink this tier (SMTP_URL) is configured against
+    # (apps/mailhog; docs/DEPLOYMENT.md "SMTP"). Only the SMTP port, not the 8025 web UI.
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: mailhog
+          podSelector:
+            matchLabels:
+              app: mailhog
+      ports:
+        - protocol: TCP
+          port: 1025
+    # The Alloy OTLP gateway (Instrumentation CR `nodejs`, apps/treelink/base/treelink/
+    # instrumentation.yaml: endpoint http://alloy-gateway.monitoring.svc.cluster.local:4318).
+    # Both OTLP ports allowed, matching the media service's egress policy, in case the Node
+    # auto-instrumentation's default exporter protocol ever falls back to gRPC (4317) instead of
+    # the HTTP exporter the Instrumentation CR names.
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - protocol: TCP
+          port: 4318
+        - protocol: TCP
+          port: 4317
+    # The public internet, for every host the app legitimately calls on a user's behalf through
+    # src/lib/safe-fetch.ts (treelink repo) and the two fixed-hostname integrations below. This is
+    # intentionally broad rather than a per-hostname allow-list: Kubernetes NetworkPolicy filters
+    # by IP/CIDR and port only (no CNI here supports FQDN-based rules — this cluster runs k3s's
+    # default policy controller, confirmed live by `ps aux` showing a plain `k3s server` with no
+    # `--disable-network-policy` flag, the same engine already enforcing the media policies), and
+    # most of what this tier fetches is NOT a fixed hostname at all:
+    #   - src/lib/link-import.ts / safe-fetch.ts: a pasted link's og:image/title/favicon — an
+    #     arbitrary URL a workspace owner types in, by design (the feature IS "fetch this URL").
+    #   - src/lib/link-safety.ts traceRedirects(): follows a saved link's redirect chain to its
+    #     final destination — again, an arbitrary host chosen by whoever created the link.
+    #   - src/lib/webhooks.ts executor: delivers to whatever URL a workspace configured as its
+    #     webhook target — arbitrary by design.
+    #   - src/lib/integrations/connectors.ts: most connector definitions set `allowedHosts: "any"`
+    #     (only Mailchimp `api.mailchimp.com` and Klaviyo `a.klaviyo.com` are fixed hosts; these
+    #     two are not separately allow-listed below because they still resolve to large, rotating
+    #     CDN ranges — pinning either to a snapshot of today's IPs would silently break on the
+    #     provider's next rotation without any signal that this NetworkPolicy was the cause).
+    # Fixed hostnames that COULD be named but are not pinned to an IP range for the same reason
+    # (all three are behind Cloudflare's or Google's edge, whose IP ranges are large and change
+    # without notice): challenges.cloudflare.com (Turnstile, src/lib/turnstile.ts),
+    # webrisk.googleapis.com (src/lib/link-safety.ts), api.pwnedpasswords.com (HIBP,
+    # src/lib/auth.ts). All three are HTTPS (443) only.
+    #
+    # What this rule still buys over "no policy": every RFC1918 range, the cluster's own pod and
+    # service CIDRs (10.42.0.0/16 and 10.43.0.0/16, both inside the 10.0.0.0/8 exception below,
+    # confirmed live via `kubectl get nodes -o jsonpath='{.spec.podCIDR}'` = 10.42.0.0/24 /
+    # 10.42.1.0/24 and the kubernetes Service clusterIP 10.43.0.1), and link-local/metadata
+    # (169.254.0.0/16) are excluded — so even a future bug that bypassed safe-fetch.ts's own
+    # application-level SSRF guard (src/lib/safe-fetch.ts already rejects these same ranges
+    # itself; this is defence in depth, not a replacement for it) could not use this pod to reach
+    # another namespace, another host on the home LAN (192.168.0.0/16, where the two k3s nodes
+    # themselves live), or the cloud metadata address — only the public internet on 80/443.
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8 # cluster pod CIDR 10.42.0.0/16 and service CIDR 10.43.0.0/16
+              - 172.16.0.0/12
+              - 192.168.0.0/16 # the home LAN; both k3s nodes (192.168.100.191/.229) are in it
+              - 169.254.0.0/16 # link-local, incl. cloud metadata addresses
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 80

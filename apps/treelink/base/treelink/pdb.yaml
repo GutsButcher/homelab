@@ -1,0 +1,20 @@
+---
+# PodDisruptionBudget for the web tier (E2 remainder). The Deployment runs exactly one replica by
+# design (RWO uploads PVC + the in-process rate limiter, CLAUDE.md "single replica by design"), so
+# this does not protect availability the way a multi-replica PDB would — there is no second pod to
+# shift load to. What it does do: make a VOLUNTARY disruption (kubectl drain, a node cordon during
+# maintenance, cluster-autoscaler-style consolidation — none of this cluster's two static nodes
+# today, but the Eviction API path is the same machinery kubectl drain uses) require an explicit
+# decision instead of silently succeeding. Read "what could break" in the PR description before
+# merging: this also means `kubectl drain` on either node will now hang on this pod specifically,
+# where today it would just evict it.
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: treelink
+  namespace: treelink
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: treelink

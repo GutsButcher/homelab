@@ -11,3 +11,5 @@ resources:
   - deployment.yaml
   - service.yaml
   - grafana-dashboard.yaml
+  - networkpolicy.yaml
+  - pdb.yaml
