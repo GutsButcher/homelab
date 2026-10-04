@@ -70,6 +70,44 @@
 # resources on the Postgres instance at all. Bounded further by activeDeadlineSeconds (30 min),
 # a weekly (not nightly) cadence, and startingDeadlineSeconds so a missed schedule window doesn't
 # silently queue up runs.
+#
+# No pods/exec on the live primary (review fix, 2026-10-04): the first draft ran row-count
+# queries with `kubectl exec treelink-db-1 -- psql -U postgres`, which needed `pods/exec create`
+# on the live primary's own pod — RBAC can scope *which pod* a token may exec into, but not
+# *which command* it runs once inside, so a leaked token for this ServiceAccount would have had
+# the practical equivalent of `psql -U postgres` superuser read/write on the production database.
+# This design reads BOTH the live snapshot and the drill snapshot over the network instead, as
+# the unprivileged app role, through the CNPG-generated Service + Secret already used by the web
+# tier (apps/treelink/base/treelink/deployment.yaml: DATABASE_URL from Secret/treelink-db-app key
+# `uri`) — never through exec, never as postgres. Concretely, the Pod below has two containers:
+#   - `restore-check` (bitnamilegacy/kubectl, the ServiceAccount's RBAC subject): all Cluster
+#     lifecycle (health checks, apply/delete the drill Cluster, wait-for-healthy). It never runs
+#     psql and never needs pods/pods-exec permissions at all — the Role below has neither.
+#   - `psql-bridge`: a native Kubernetes *sidecar* container (`restartPolicy: Always` on an
+#     initContainer — GA since Kubernetes 1.29; this cluster runs k3s v1.34.1, confirmed with the
+#     read-only `kubectl version`) built from `postgres:17-alpine`, which always ships the psql
+#     client. It holds the treelink-db-app credentials as env vars and answers queries the
+#     `restore-check` container hands it over a shared `emptyDir` (a trivial file-based RPC: write
+#     a request, touch a ready-flag, the sidecar runs psql and writes the response back). Native
+#     sidecars are terminated automatically once the regular container exits, successfully or
+#     not, so no extra shutdown signalling is needed.
+# Credential-reuse assumption, stated explicitly (per review): CNPG's recovery bootstrap replays
+# the backed-up PGDATA verbatim, so the "app" role's password *inside Postgres* on the drill
+# cluster is whatever the backup captured — the SAME password already in Secret/treelink-db-app,
+# not a freshly generated one. The script does not merely assume this: right after the drill
+# Cluster reports healthy, it runs a `select 1` preflight against the drill's own `-rw` Service
+# using those same credentials, and FAILS CLOSED with a message naming the credential assumption
+# (not "the backup is bad") if that preflight does not return exactly `1`. Network reachability:
+# no NetworkPolicy in this repo restricts ingress to the CNPG Cluster pods or their Services in
+# namespace `treelink` — the only NetworkPolicy mentioning `treelink-db` is an egress rule on the
+# media service (apps/treelink/base/media/networkpolicy.yaml), which does not restrict who may
+# reach port 5432 — so absent an undeclared, cluster-only policy, this Job's pod can already reach
+# `treelink-db-rw` and (once created) `treelink-db-restore-check-rw` on port 5432 without further
+# changes. Secret/treelink-db-app's keys (`username`, `password`, `dbname`, plus the `uri` key
+# already consumed by deployment.yaml) are CNPG's documented, non-configurable "app" Secret
+# format, cross-checked here against that one already-consumed key — not independently
+# re-confirmed against the live Secret itself (reading it was out of scope for this fix; see "Not
+# verified" in the PR description).
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -88,17 +126,23 @@ automountServiceAccountToken: true
 #     deletable or patchable by this role.
 #   - get/delete on the PVC: only treelink-db-restore-check-1 (CNPG's instance-1 PVC naming
 #     convention for this drill cluster name).
-#   - get + pods/exec create: only treelink-db-1 (read-only row counts off the live primary) and
-#     treelink-db-restore-check-1 (the drill's own pod). This role cannot exec into the web pod,
-#     the media pod, or any other pod in the namespace.
+# This Role grants NOTHING on pods, pods/exec or secrets (review fix, 2026-10-04): the first draft
+# needed `get`+`pods/exec create` on `treelink-db-1` (the live primary's own pod) to run
+# `psql -U postgres` row-count queries, which RBAC could scope by pod name but not by command —
+# a leaked token would have had the practical equivalent of production superuser access. Row
+# counts are now read over the network (treelink-db-rw / treelink-db-restore-check-rw Services)
+# by the unprivileged app role, as the `psql-bridge` sidecar container, not as this ServiceAccount
+# — see the file header for the two-container design. This Role is therefore exactly four rules,
+# all on `clusters`/`persistentvolumeclaims`, nothing else:
 # What is NOT scoped, because RBAC's `create` verb has no object to attach a resourceName to
 # before it exists: `create` on Cluster objects is namespace-wide. A leaked token for this
 # ServiceAccount could therefore create an arbitrarily-named Cluster (consuming storage, pulling
 # whatever imageName it specifies) but could not read, modify, or delete anything beyond
-# treelink-db-restore-check, nor touch treelink-db. This residual gap is inherent to Kubernetes
-# RBAC (the same gap the t15 draft documents for its own, differently-named role), not an
-# oversight here; closing it fully would need an admission policy (Kyverno/OPA Gatekeeper,
-# neither installed in this cluster) — out of scope for this proposal.
+# treelink-db-restore-check, nor touch treelink-db, nor exec into or read secrets from any pod.
+# This residual gap is inherent to Kubernetes RBAC (the same gap the t15 draft documents for its
+# own, differently-named role), not an oversight here; closing it fully would need an admission
+# policy (Kyverno/OPA Gatekeeper, neither installed in this cluster) — out of scope for this
+# proposal.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
@@ -120,14 +164,6 @@ rules:
     resources: ["persistentvolumeclaims"]
     verbs: ["get", "delete"]
     resourceNames: ["treelink-db-restore-check-1"]
-  - apiGroups: [""]
-    resources: ["pods"]
-    verbs: ["get"]
-    resourceNames: ["treelink-db-1", "treelink-db-restore-check-1"]
-  - apiGroups: [""]
-    resources: ["pods/exec"]
-    verbs: ["create"]
-    resourceNames: ["treelink-db-1", "treelink-db-restore-check-1"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
@@ -143,13 +179,21 @@ subjects:
     name: treelink-restore-check
     namespace: treelink
 ---
-# NOT independently verified: that docker.io/bitnami/kubectl:1.34 exists at this tag, pulls, and
-# behaves as expected (bash, GNU coreutils `date -d`, non-root default uid) — carried over
-# unverified from the t15 draft, same image choice, because this host's rules forbid any image
-# pull for validation. The owner or CI should confirm this once (e.g. by un-suspending briefly in
-# a controlled way, or `kubectl create job --from=cronjob/treelink-restore-check`) before relying
-# on the schedule. Same caveat for recovering to the latest WAL (see the big header comment
-# above): prove that path once by hand first.
+# Image fix (review, 2026-10-04): `docker.io/bitnami/kubectl:1.34`, carried over unverified from
+# the t15 draft, does not exist — Bitnami retired every numbered tag on the free-tier `bitnami/*`
+# Docker Hub namespace (only `latest`/`latest-metadata` survive there now); the CronJob would sit
+# in permanent ImagePullBackOff the first time it ran. Same break, same fix already live in this
+# repo at apps/erp/base/erp/db-bootstrap.yaml:91-100: `bitnamilegacy/*` still publishes the
+# numbered tags, ships a shell, and already runs as uid 1001. Verified live against the Docker
+# Hub registry API (`GET /v2/repositories/bitnamilegacy/kubectl/tags/1.33`) on 2026-10-04: tag
+# `1.33` exists (HTTP 200, last pushed 2025-07-20), and the digest below is that response's
+# manifest-list digest, pinned so a future retag can't silently change what this Job pulls.
+# NOT independently verified: that this image behaves as expected (bash, GNU coreutils `date -d`,
+# non-root default uid) beyond the erp precedent's own comment — this host's rules forbid any
+# image pull for validation. The owner or CI should confirm this once (e.g. by un-suspending
+# briefly in a controlled way, or `kubectl create job --from=cronjob/treelink-restore-check`)
+# before relying on the schedule. Same caveat for recovering to the latest WAL (see the big header
+# comment above): prove that path once by hand first.
 apiVersion: batch/v1
 kind: CronJob
 metadata:
@@ -193,9 +237,75 @@ spec:
             runAsGroup: 1001
             seccompProfile:
               type: RuntimeDefault
+          # Native sidecar (restartPolicy: Always on an initContainer, GA since Kubernetes 1.29;
+          # this cluster's server is v1.34.1 — confirmed read-only with `kubectl version`). It
+          # starts before `restore-check`, runs concurrently with it, and is terminated
+          # automatically once `restore-check` exits — success or failure — with no extra
+          # shutdown signalling needed. See the file header for why this exists (no pods/exec on
+          # the live primary).
+          initContainers:
+            - name: psql-bridge
+              image: postgres:17-alpine
+              restartPolicy: Always
+              env:
+                - name: HOME
+                  value: /tmp
+                - name: PGUSER
+                  valueFrom:
+                    secretKeyRef:
+                      name: treelink-db-app
+                      key: username
+                - name: PGPASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: treelink-db-app
+                      key: password
+                - name: PGDATABASE
+                  valueFrom:
+                    secretKeyRef:
+                      name: treelink-db-app
+                      key: dbname
+              command: ["/bin/sh", "-c"]
+              args:
+                - |
+                  set -u
+                  trap 'echo "psql-bridge: terminating"; exit 0' TERM
+                  echo "psql-bridge: ready (PGUSER=$PGUSER PGDATABASE=$PGDATABASE)"
+                  while true; do
+                    if [ -f /shared/request.ready ]; then
+                      req_host="$(cat /shared/request.host 2>/dev/null || true)"
+                      req_sql="$(cat /shared/request.sql 2>/dev/null || true)"
+                      rm -f /shared/request.ready
+                      if out="$(psql -h "$req_host" -p 5432 -tAc "$req_sql" 2>&1)"; then
+                        rc=0
+                      else
+                        rc=1
+                      fi
+                      printf '%s' "$out" > /shared/response.out
+                      printf '%s' "$rc" > /shared/response.rc
+                      touch /shared/response.ready
+                    fi
+                    sleep 1
+                  done
+              resources:
+                requests:
+                  cpu: 50m
+                  memory: 64Mi
+                limits:
+                  memory: 128Mi
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: ["ALL"]
+              volumeMounts:
+                - name: shared
+                  mountPath: /shared
+                - name: psql-bridge-tmp
+                  mountPath: /tmp
           containers:
             - name: restore-check
-              image: docker.io/bitnami/kubectl:1.34
+              image: docker.io/bitnamilegacy/kubectl:1.33@sha256:cd354d5b25562b195b277125439c23e4046902d7f1abc0dc3c75aad04d298c17
               command: ["/bin/bash", "-c"]
               env:
                 - name: HOME
@@ -206,6 +316,34 @@ spec:
                   ns=treelink
                   name=treelink-db-restore-check
                   echo "restore check (weekly CronJob) start: name=$name host=$(uname -n)"
+
+                  # RPC to the psql-bridge sidecar over a shared emptyDir (see the file header):
+                  # this container has no psql client and no RBAC to exec into any pod. Every
+                  # row-count/heartbeat/preflight query goes through here, never through exec.
+                  q() {
+                    host="$1"; sql="$2"
+                    rm -f /shared/response.ready /shared/response.rc /shared/response.out
+                    printf '%s' "$host" > /shared/request.host
+                    printf '%s' "$sql" > /shared/request.sql
+                    touch /shared/request.ready
+                    waited=0
+                    while [ ! -f /shared/response.ready ]; do
+                      sleep 1
+                      waited=$((waited + 1))
+                      if [ "$waited" -gt 30 ]; then
+                        echo "ERRORbridgetimeout"
+                        return 0
+                      fi
+                    done
+                    rc="$(cat /shared/response.rc 2>/dev/null || echo 1)"
+                    out="$(cat /shared/response.out 2>/dev/null || true)"
+                    if [ "$rc" = "0" ]; then
+                      printf '%s' "$out" | tr -d '[:space:]'
+                    else
+                      printf 'ERROR%s' "$out" | tr -d '[:space:]'
+                    fi
+                  }
+                  is_int() { case "$1" in ''|*[!0-9]*) return 1;; *) return 0;; esac; }
 
                   kubectl -n "$ns" get cluster treelink-db >/dev/null
                   prod_phase="$(kubectl -n "$ns" get cluster treelink-db -o jsonpath='{.status.phase}')"
@@ -220,16 +358,16 @@ spec:
                     exit 1
                   fi
 
-                  # Live snapshot, captured BEFORE anything is created. Fail-closed: any query
-                  # error here aborts before a drill cluster is even applied — there is no point
-                  # testing a restore against a baseline we could not actually read.
-                  q() { kubectl -n "$ns" exec treelink-db-1 -c postgres -- psql -U postgres -d treelink -tAc "$1" 2>/dev/null | tr -d '[:space:]' || echo ERROR; }
-                  is_int() { case "$1" in ''|*[!0-9]*) return 1;; *) return 0;; esac; }
-
-                  live_users="$(q 'select count(*) from users')"
-                  live_pages="$(q 'select count(*) from pages')"
-                  live_blocks="$(q 'select count(*) from blocks')"
-                  live_migrations="$(q 'select count(*) from drizzle.__drizzle_migrations')"
+                  # Live snapshot, read over the network from the live primary's own -rw Service
+                  # (treelink-db-rw) as the unprivileged app role — never pods/exec, never
+                  # postgres superuser; see the file header. Captured BEFORE anything is created.
+                  # Fail-closed: any query error here aborts before a drill cluster is even
+                  # applied — there is no point testing a restore against a baseline we could not
+                  # actually read.
+                  live_users="$(q treelink-db-rw 'select count(*) from users')"
+                  live_pages="$(q treelink-db-rw 'select count(*) from pages')"
+                  live_blocks="$(q treelink-db-rw 'select count(*) from blocks')"
+                  live_migrations="$(q treelink-db-rw 'select count(*) from drizzle.__drizzle_migrations')"
                   for v in "$live_users" "$live_pages" "$live_blocks" "$live_migrations"; do
                     if ! is_int "$v"; then
                       echo "restore check RESULT: FAIL (could not read a live snapshot value, got '$v'; refusing to start a drill with no baseline)"
@@ -315,18 +453,30 @@ spec:
                   fi
                   echo "RTO: Cluster/$name reported healthy ${rto}s after apply"
 
-                  dq() { kubectl -n "$ns" exec "${name}-1" -c postgres -- psql -U postgres -d treelink -tAc "$1" 2>/dev/null | tr -d '[:space:]' || echo ERROR; }
-                  drill_users="$(dq 'select count(*) from users')"
-                  drill_pages="$(dq 'select count(*) from pages')"
-                  drill_blocks="$(dq 'select count(*) from blocks')"
-                  drill_migrations="$(dq 'select count(*) from drizzle.__drizzle_migrations')"
+                  drill_host="${name}-rw"
+                  # Credential-reuse preflight (review fix, 2026-10-04 — see the file header for
+                  # the full assumption): this job connects to the drill cluster with the SAME
+                  # treelink-db-app credentials as the live primary, on the assumption that CNPG
+                  # recovery replays the backed-up PGDATA (and so the app role's password inside
+                  # Postgres) verbatim. Verify that assumption itself before trusting anything it
+                  # reads: a plain `select 1` must come back as exactly "1".
+                  drill_preflight="$(q "$drill_host" 'select 1')"
+                  if [ "$drill_preflight" != "1" ]; then
+                    echo "restore check RESULT: FAIL (could not authenticate to the drill cluster at $drill_host with the treelink-db-app credentials, got '$drill_preflight'; this breaks the assumption that CNPG recovery preserves the app role's password from the backup — see the file header. A credential/assumption failure, not evidence the backup itself is bad.)"
+                    exit 1
+                  fi
+
+                  drill_users="$(q "$drill_host" 'select count(*) from users')"
+                  drill_pages="$(q "$drill_host" 'select count(*) from pages')"
+                  drill_blocks="$(q "$drill_host" 'select count(*) from blocks')"
+                  drill_migrations="$(q "$drill_host" 'select count(*) from drizzle.__drizzle_migrations')"
                   # WAL-applied-freshness check: how long ago (on the DRILL cluster's own clock)
                   # the most recent background-job heartbeat was. Background jobs heartbeat far
                   # more often than 15 minutes in normal operation (src/lib/jobs.ts), so a value
                   # over 900s proves WAL replay stopped well short of "now" even if the Cluster
                   # object itself reports healthy — the row-count checks alone would not catch
                   # this (a frozen-early restore can still have plausible, non-zero row counts).
-                  drill_heartbeat_age="$(dq 'select extract(epoch from (now() - max(last_run_at)))::bigint from job_heartbeats')"
+                  drill_heartbeat_age="$(q "$drill_host" 'select extract(epoch from (now() - max(last_run_at)))::bigint from job_heartbeats')"
 
                   echo "drill: users=$drill_users pages=$drill_pages blocks=$drill_blocks migrations=$drill_migrations heartbeat_age_s=$drill_heartbeat_age"
 
@@ -372,7 +522,15 @@ spec:
               volumeMounts:
                 - name: tmp
                   mountPath: /tmp
+                - name: shared
+                  mountPath: /shared
           volumes:
             - name: tmp
               emptyDir:
                 sizeLimit: 64Mi
+            - name: psql-bridge-tmp
+              emptyDir:
+                sizeLimit: 64Mi
+            - name: shared
+              emptyDir:
+                sizeLimit: 16Mi
