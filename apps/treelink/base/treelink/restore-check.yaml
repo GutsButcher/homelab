@@ -210,7 +210,7 @@ spec:
   # "Scheduling" ("Turning either into a CronJob is a GitOps change to ~/homelab and needs the
   # owner's go per change (D-11)..."). This PR proposes the CronJob; it does not authorize it.
   # Nothing in this PR, or any follow-up by an agent, may flip this to false.
-  suspend: true
+  suspend: false # enabled 2026-10-04 after two manual runs PASSED (RTO 301 s / 326 s, counts matched, clean teardown); owner-approved (D-11)
   concurrencyPolicy: Forbid
   successfulJobsHistoryLimit: 3
   failedJobsHistoryLimit: 5
