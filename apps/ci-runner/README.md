@@ -153,7 +153,10 @@ is still set and no matching runner is available; for a clean fallback, also uns
   with those packages baked in, built by treelink's own CI — is intentionally out of scope here;
   the owner decides when to prioritize it.
 - **Persistent workspace.** Unlike GitHub-hosted (fresh VM every run), `_work` and `.cache`
-  persist across jobs on this PVC. This is mostly a win (warm npm/Playwright caches) but means
+  persist across jobs on this PVC (`NPM_CONFIG_CACHE=/home/runner/.cache/npm` puts npm's cache
+  there as well; treelink's ci.yml skips GitHub's remote caches on self-hosted runners since its
+  PR #106 because they stream into the homelab at ~1 MB/s). This is mostly a win (warm
+  npm/Playwright caches) but means
   stale files from a previous job's checkout can leak into the next one if a workflow assumes a
   clean workspace. `actions/checkout` cleans its own target directory; anything a step writes
   outside of that is the workflow's problem, not this runner's.
