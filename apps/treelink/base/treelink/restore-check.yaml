@@ -122,8 +122,8 @@ automountServiceAccountToken: true
 #   - get/watch on Cluster objects: only treelink-db (read-only health check) and
 #     treelink-db-restore-check (the drill cluster itself). This role can never read, let alone
 #     touch, any other Cluster in the namespace.
-#   - delete/patch/update on Cluster: only treelink-db-restore-check. treelink-db is NEVER
-#     deletable or patchable by this role.
+#   - delete on Cluster: only treelink-db-restore-check. treelink-db is NEVER deletable by this
+#     role; no patch/update is granted because the script never patches anything.
 #   - get/delete on the PVC: only treelink-db-restore-check-1 (CNPG's instance-1 PVC naming
 #     convention for this drill cluster name).
 # This Role grants NOTHING on pods, pods/exec or secrets (review fix, 2026-10-04): the first draft
@@ -158,7 +158,7 @@ rules:
     verbs: ["create"] # cannot be resourceName-scoped; see the RBAC note above
   - apiGroups: ["postgresql.cnpg.io"]
     resources: ["clusters"]
-    verbs: ["delete", "patch", "update"]
+    verbs: ["delete"] # the script only ever get/watch/create/deletes Clusters
     resourceNames: ["treelink-db-restore-check"]
   - apiGroups: [""]
     resources: ["persistentvolumeclaims"]
@@ -188,8 +188,9 @@ subjects:
 # Hub registry API (`GET /v2/repositories/bitnamilegacy/kubectl/tags/1.33`) on 2026-10-04: tag
 # `1.33` exists (HTTP 200, last pushed 2025-07-20), and the digest below is that response's
 # manifest-list digest, pinned so a future retag can't silently change what this Job pulls.
-# NOT independently verified: that this image behaves as expected (bash, GNU coreutils `date -d`,
-# non-root default uid) beyond the erp precedent's own comment — this host's rules forbid any
+# NOT independently verified: that this image ships /bin/bash (the script uses `set -o pipefail`,
+# so it needs bash, not only /bin/sh — the erp precedent only proves /bin/sh) and a non-root
+# default uid, beyond the erp precedent's own comment — this host's rules forbid any
 # image pull for validation. The owner or CI should confirm this once (e.g. by un-suspending
 # briefly in a controlled way, or `kubectl create job --from=cronjob/treelink-restore-check`)
 # before relying on the schedule. Same caveat for recovering to the latest WAL (see the big header
@@ -423,6 +424,12 @@ spec:
                     externalClusters:
                       - name: treelink-db-source
                         barmanObjectStore:
+                          # serverName MUST be the live cluster's name: in an externalCluster
+                          # CNPG defaults it to the alias above (treelink-db-source), while the
+                          # live backup writes under its own Cluster name (treelink-db) — without
+                          # this line the recovery looks in a catalog path that was never written
+                          # to and the drill fails on every run (round-2 review of homelab #12).
+                          serverName: treelink-db
                           destinationPath: s3://treelink-db/
                           endpointURL: http://rustfs.rustfs.svc.cluster.local:9000
                           s3Credentials:
