@@ -17,7 +17,7 @@ images:
   # Written by scripts/release.sh in the treelink repo on every release. This
   # single line is the handoff between the build and ArgoCD; not edited by hand.
   - name: gitea.gwynbliedd.com/gwynbliedd/treelink
-    newTag: sha-60b6fb0
+    newTag: sha-02d7262
   # Media service image: built by the same CI run, same tag (the release script sets both lines).
   - name: gitea.gwynbliedd.com/gwynbliedd/treelink-media
     newTag: sha-bb74859
