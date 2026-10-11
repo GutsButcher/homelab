@@ -93,6 +93,11 @@ spec:
                   optional: true
             - name: APP_URL
               value: https://treelink.gwynbliedd.com
+            # Mishkat design gallery at /design (treelink docs/REDESIGN.md, owner decision B-13):
+            # on for the development tier so the redesign can be reviewed on the real cluster.
+            # Read-only previews of UI primitives, no data. A production platform does not set it.
+            - name: DESIGN_GALLERY
+              value: "1"
             # Field-encryption keyring (treelink docs/SECURITY.md § Key material and rotation):
             # separate from SESSION_SECRET; rotated by prepending a key and letting maintenance
             # re-encrypt. Optional so an image without the keyring still boots on the legacy key.
