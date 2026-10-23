@@ -3,6 +3,9 @@ kind: Kustomization
 resources:
   - secrets.yaml
   - backup-s3-secret.yaml
+  - backup-s3-scoped-secret.yaml
+  - offsite-backup.yaml
+  - restore-drill.yaml
   - cnpg.yaml
   - backup.yaml
   - uploads-backup.yaml

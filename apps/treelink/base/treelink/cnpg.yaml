@@ -35,8 +35,26 @@ spec:
   storage:
     size: 5Gi
   # On-prem backups: base backups + WAL archive in RustFS (apps/rustfs, node01),
-  # 14 days of point-in-time recovery. Credentials: SealedSecret treelink-backup-s3.
-  # Procedure and restore drill: docs/BACKUPS.md in the treelink repo.
+  # 14 days of point-in-time recovery. Procedure and restore drill: docs/BACKUPS.md in the
+  # treelink repo.
+  #
+  # T-15/E4: credentials are the bucket-scoped treelink-backup-s3-scoped (see
+  # backup-s3-scoped-secret.yaml for what "scoped" means and the pre-merge step that makes it
+  # real), replacing treelink-backup-s3 — which is RustFS's own ROOT credential
+  # (docs/BACKUPS.md: "the same key pair is RustFS's root credential"), i.e. barman held
+  # root-on-the-whole-object-store access to do nothing but read/write one bucket. The old
+  # treelink-backup-s3 Secret (backup-s3-secret.yaml) is left in place and still used by
+  # uploads-backup.yaml and media-backup.yaml (a different bucket, treelink-uploads) — scoping
+  # those too is the same idea but was not asked for in this change and is not done here.
+  #
+  # `encryption: AES256` on both wal and data asks barman-cloud to send
+  # `x-amz-server-side-encryption: AES256` on every object it writes (CNPG's barmanObjectStore
+  # CRD field, not a new mechanism this PR invents). NOT independently verified here: whether
+  # RustFS's S3 implementation actually honours that header and encrypts at rest, or silently
+  # ignores it and stores plaintext anyway — RustFS was not queried or changed as part of this
+  # PR. Confirm after merge with the owner's own knowledge of RustFS's SSE support before
+  # treating "backups unencrypted" (docs/PRODUCTION-READINESS.md §3) as closed; if RustFS ignores
+  # the header, this line is a no-op, not a regression, but also not the fix it looks like.
   backup:
     retentionPolicy: "14d"
     barmanObjectStore:
@@ -44,13 +62,15 @@ spec:
       endpointURL: http://rustfs.rustfs.svc.cluster.local:9000
       s3Credentials:
         accessKeyId:
-          name: treelink-backup-s3
+          name: treelink-backup-s3-scoped
           key: ACCESS_KEY_ID
         secretAccessKey:
-          name: treelink-backup-s3
+          name: treelink-backup-s3-scoped
           key: ACCESS_SECRET_KEY
       wal:
         compression: gzip
+        encryption: AES256
       data:
         compression: gzip
         jobs: 1
+        encryption: AES256
