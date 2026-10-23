@@ -1,0 +1,59 @@
+---
+# EXAMPLE — NOT WIRED INTO ARGO CD. Same caveats as ../argocd/treelink-staging.yaml: not
+# referenced anywhere, copy it in only once D-16 is decided and the production cluster exists.
+#
+# The one deliberate difference from staging: NO `syncPolicy.automated`. Every production sync is
+# a human clicking "Sync" (or `argocd app sync treelink-production`) in Argo CD, after
+# docs/LAUNCH-GATES.md says the release may proceed — this is the GitOps form of
+# docs/ENVIRONMENTS.md's "declared windows; who approves" requirement for the production tier.
+# `selfHeal` is also off for the same reason: an unreviewed drift-revert in production is still an
+# unreviewed production change.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: treelink-production
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: homelab # REPLACE_ME — strongly recommended: a dedicated AppProject scoped to only this destination/namespace, with manual-sync-only enforced at the project level too (defense in depth against someone adding automated: {} back by mistake)
+  destination:
+    server: https://REPLACE_ME-production-cluster-api:6443
+    namespace: treelink
+  sources:
+    - repoURL: https://github.com/GutsButcher/homelab.git
+      targetRevision: main
+      path: apps/treelink/envs/production
+  # No `automated:` block: manual sync only. The PR that bumps the image digest in
+  # apps/treelink/envs/production/kustomization.yaml is reviewed and merged first (ordinary GitOps
+  # review); syncing it into the cluster is a SEPARATE, explicit action by whoever is on the
+  # approval list in docs/ENVIRONMENTS.md.
+  syncPolicy:
+    syncOptions:
+      - ServerSideApply=true
+      - RespectIgnoreDifferences=true
+      - CreateNamespace=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 30s
+        factor: 2
+        maxDuration: 10m
+  ignoreDifferences:
+    - group: ""
+      kind: Secret
+      name: treelink-db-app
+      jsonPointers:
+        - /data
+    - group: apps
+      kind: Deployment
+      name: treelink
+      jsonPointers:
+        - /spec/replicas
+    - group: apps
+      kind: Deployment
+      name: treelink-media
+      jsonPointers:
+        - /spec/replicas

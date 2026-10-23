@@ -1,0 +1,39 @@
+# The dev-tier media Deployment hardcodes S3_ENDPOINT/S3_REGION/S3_FORCE_PATH_STYLE as literal
+# `value:` entries because there is exactly one object-storage endpoint in the homelab (RustFS).
+# Staging and production point at a real S3-compatible provider instead (owner decision, "S3" row
+# in apps/treelink/envs/README.md) and need their own endpoint/region per env, so these three
+# become configMapKeyRef against `treelink-media-object-storage` (object-storage-config.yaml in
+# each env directory) instead. S3_BUCKET/S3_ACCESS_KEY_ID/S3_SECRET_ACCESS_KEY stay as
+# secretKeyRef against treelink-media-secrets (media-secrets-placeholder.yaml per env) — unchanged
+# shape from the base Deployment, just a placeholder Secret instead of the dev-cluster's sealed one.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: treelink-media
+spec:
+  template:
+    spec:
+      containers:
+        - name: media
+          env:
+            # `value: null` clears the base's literal string — Kubernetes rejects an env entry
+            # that sets both `value` and `valueFrom`, and a strategic-merge patch only ADDS
+            # `valueFrom` unless the old scalar is explicitly nulled out.
+            - name: S3_ENDPOINT
+              value: null
+              valueFrom:
+                configMapKeyRef:
+                  name: treelink-media-object-storage
+                  key: S3_ENDPOINT
+            - name: S3_REGION
+              value: null
+              valueFrom:
+                configMapKeyRef:
+                  name: treelink-media-object-storage
+                  key: S3_REGION
+            - name: S3_FORCE_PATH_STYLE
+              value: null
+              valueFrom:
+                configMapKeyRef:
+                  name: treelink-media-object-storage
+                  key: S3_FORCE_PATH_STYLE

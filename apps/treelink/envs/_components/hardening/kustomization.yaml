@@ -1,0 +1,107 @@
+apiVersion: kustomize.config.k8s.io/v1alpha1
+kind: Component
+# Shared by apps/treelink/envs/staging and apps/treelink/envs/production. Everything here is the
+# hardening the dev-tier base does not need (it is single-replica by design, docs/DEPLOYMENT.md)
+# but a staging/production tier does: no RWO upload volume on the web tier (TDR-0003 Phase 1 has
+# moved uploads to the media service by the time this infrastructure exists), a web NetworkPolicy,
+# PDBs, an HPA for the web tier, read-only root filesystems, and a DATABASE_URL that carries
+# sslmode=require. See apps/treelink/envs/README.md for the full picture and every "owner fills"
+# placeholder this introduces.
+resources:
+  - pdb-web.yaml
+  - pdb-media.yaml
+  - networkpolicy-web.yaml
+  - hpa-web.yaml
+  - db-url-secret.yaml
+
+# Drop the dev-cluster SealedSecrets: they are ciphertext sealed against the homelab's
+# sealed-secrets controller key and cannot be decrypted by any other cluster. Each env overlay
+# supplies its own placeholder Secret with the same name/keys (REPLACE_ME values) instead.
+# Drop the RWO uploads volume and its nightly backup CronJob: the web tier in this component is
+# patched to be stateless (patch-web-stateless.yaml removes the volume/mount), so nothing writes
+# to that PVC here.
+patches:
+  - target:
+      kind: SealedSecret
+      name: treelink-secrets
+    patch: |-
+      $patch: delete
+      apiVersion: bitnami.com/v1alpha1
+      kind: SealedSecret
+      metadata:
+        name: treelink-secrets
+  - target:
+      kind: SealedSecret
+      name: gitea-registry
+    patch: |-
+      $patch: delete
+      apiVersion: bitnami.com/v1alpha1
+      kind: SealedSecret
+      metadata:
+        name: gitea-registry
+  - target:
+      kind: SealedSecret
+      name: treelink-backup-s3
+    patch: |-
+      $patch: delete
+      apiVersion: bitnami.com/v1alpha1
+      kind: SealedSecret
+      metadata:
+        name: treelink-backup-s3
+  - target:
+      kind: SealedSecret
+      name: treelink-media-db
+    patch: |-
+      $patch: delete
+      apiVersion: bitnami.com/v1alpha1
+      kind: SealedSecret
+      metadata:
+        name: treelink-media-db
+  - target:
+      kind: SealedSecret
+      name: treelink-media-secrets
+    patch: |-
+      $patch: delete
+      apiVersion: bitnami.com/v1alpha1
+      kind: SealedSecret
+      metadata:
+        name: treelink-media-secrets
+  - target:
+      kind: SealedSecret
+      name: treelink-media-client
+    patch: |-
+      $patch: delete
+      apiVersion: bitnami.com/v1alpha1
+      kind: SealedSecret
+      metadata:
+        name: treelink-media-client
+  - target:
+      kind: PersistentVolumeClaim
+      name: treelink-uploads
+    patch: |-
+      $patch: delete
+      apiVersion: v1
+      kind: PersistentVolumeClaim
+      metadata:
+        name: treelink-uploads
+  - target:
+      kind: CronJob
+      name: treelink-uploads-backup
+    patch: |-
+      $patch: delete
+      apiVersion: batch/v1
+      kind: CronJob
+      metadata:
+        name: treelink-uploads-backup
+  - path: patch-web-stateless.yaml
+    target:
+      kind: Deployment
+      name: treelink
+  - path: patch-web-db-url-env.yaml
+    target:
+      kind: Deployment
+      name: treelink
+  - path: patch-media-object-storage-env.yaml
+    target:
+      kind: Deployment
+      name: treelink-media

@@ -1,0 +1,15 @@
+---
+# Non-secret object-storage settings for the media service (see
+# ../_components/hardening/patch-media-object-storage-env.yaml for why these moved out of the
+# Deployment's literal env values). REPLACE_ME with the provider's values once the "S3" owner-fill
+# (../README.md) is provisioned. S3_FORCE_PATH_STYLE is "true" for most S3-compatible providers
+# (MinIO/RustFS-style); set it to "false" for AWS S3 itself (virtual-hosted-style by default).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: treelink-media-object-storage
+  namespace: treelink
+data:
+  S3_ENDPOINT: "https://REPLACE_ME-object-storage-endpoint"
+  S3_REGION: "REPLACE_ME"
+  S3_FORCE_PATH_STYLE: "REPLACE_ME" # "true" or "false" — see comment above

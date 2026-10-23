@@ -1,0 +1,12 @@
+---
+# See ../staging/object-storage-config.yaml. Use production's own endpoint/region even if the same
+# provider account is used for both environments.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: treelink-media-object-storage
+  namespace: treelink
+data:
+  S3_ENDPOINT: "https://REPLACE_ME-object-storage-endpoint"
+  S3_REGION: "REPLACE_ME"
+  S3_FORCE_PATH_STYLE: "REPLACE_ME"

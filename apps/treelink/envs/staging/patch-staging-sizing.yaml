@@ -1,0 +1,10 @@
+# The hardening component's HPA defaults to TDR-0003 §F's production floor (min 2, max 6).
+# Staging is "small sizes" (TDR-0003 §G): one replica normally, up to 3 under load so the e2e
+# browser matrix and load scenarios (npm run load) have somewhere to burst to.
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: treelink
+spec:
+  minReplicas: 1
+  maxReplicas: 3

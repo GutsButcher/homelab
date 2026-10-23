@@ -1,0 +1,22 @@
+# Where does staging's telemetry go? OWNER DECISION (docs/infra/production-provisioning.md,
+# "Where does production observability live?"): a managed Grafana Cloud / managed OTLP endpoint,
+# or a second, independent LGTM install for staging+production (the homelab's lgtm-alloy is
+# development-only and does not extend here). Both Instrumentation CRs below point at the same
+# REPLACE_ME endpoint; split them if the owner picks different backends per environment.
+apiVersion: opentelemetry.io/v1alpha1
+kind: Instrumentation
+metadata:
+  name: nodejs
+  namespace: treelink
+spec:
+  exporter:
+    endpoint: https://REPLACE_ME-otlp-endpoint:4318
+---
+apiVersion: opentelemetry.io/v1alpha1
+kind: Instrumentation
+metadata:
+  name: nodejs-media
+  namespace: treelink
+spec:
+  exporter:
+    endpoint: https://REPLACE_ME-otlp-endpoint:4318

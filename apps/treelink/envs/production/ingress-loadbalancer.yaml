@@ -1,0 +1,30 @@
+---
+# Option B — see ../staging/ingress-loadbalancer.yaml for the full explanation. Production's own
+# hostname, its own TLS secret/cert, and its own firewall allow-list for Cloudflare's IP ranges
+# (docs/CLOUDFLARE-PRODUCTION.md "Origin protection").
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: treelink
+  namespace: treelink
+  annotations:
+    cert-manager.io/cluster-issuer: "REPLACE_ME"
+spec:
+  ingressClassName: REPLACE_ME
+  tls:
+    - hosts:
+        - REPLACE_ME-production.example.com
+      secretName: treelink-tls
+  rules:
+    - host: REPLACE_ME-production.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: treelink
+                port:
+                  number: 3000
+# Same note as ../staging/ingress-loadbalancer.yaml: label the Ingress controller's namespace
+#   kubectl label namespace <ingress-controller-namespace> treelink.io/edge-ingress=allow

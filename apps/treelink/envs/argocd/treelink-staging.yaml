@@ -1,0 +1,67 @@
+---
+# EXAMPLE — NOT WIRED INTO ARGO CD. Not referenced from argocd/applications/apps/ or any
+# app-of-apps; copy it there (and remove this header) only once the owner has decided D-16 and the
+# staging cluster/namespace this `destination` points at actually exists. Modeled on
+# argocd/applications/apps/treelink.yaml (the dev-tier Application) with two differences: a
+# separate `destination.server` for the new cluster, and `path: apps/treelink/envs/staging`.
+#
+# `destination.server`: REPLACE_ME. If staging is a separate cluster, register it first
+# (`argocd cluster add <context>` from an Argo CD CLI with access to both, or add it as a Secret
+# per https://argo-cd.readthedocs.io/en/stable/operator-manual/declarative-setup/#clusters) and use
+# its API server URL here — never `https://kubernetes.default.svc` unless staging really is the
+# same cluster Argo CD itself runs in. apps/treelink/envs/README.md "One cluster or two?" spells
+# out why this skeleton assumes separate clusters.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: treelink-staging
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: homelab # REPLACE_ME if staging gets its own AppProject (recommended: separate RBAC from the dev-tier "homelab" project)
+  destination:
+    server: https://REPLACE_ME-staging-cluster-api:6443
+    namespace: treelink
+  sources:
+    - repoURL: https://github.com/GutsButcher/homelab.git
+      targetRevision: main
+      path: apps/treelink/envs/staging
+  # Staging auto-syncs: every green merge to main should reach it without a human step (TDR-0003
+  # §G, "every merge to main deploys via GitOps"), which is exactly how it earns the right to gate
+  # production.
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - ServerSideApply=true
+      - RespectIgnoreDifferences=true
+      - CreateNamespace=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 30s
+        factor: 2
+        maxDuration: 10m
+  ignoreDifferences:
+    # CNPG mints treelink-db-app itself; git never holds it (same as the dev-tier Application).
+    - group: ""
+      kind: Secret
+      name: treelink-db-app
+      jsonPointers:
+        - /data
+    # The web and media HPAs own replicas once the Deployments exist; without this, Argo's
+    # selfHeal fights the HPA every reconcile (both revert the other's replica count).
+    - group: apps
+      kind: Deployment
+      name: treelink
+      jsonPointers:
+        - /spec/replicas
+    - group: apps
+      kind: Deployment
+      name: treelink-media
+      jsonPointers:
+        - /spec/replicas

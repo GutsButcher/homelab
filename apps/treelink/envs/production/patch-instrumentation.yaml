@@ -1,0 +1,20 @@
+# See ../staging/patch-instrumentation.yaml — same OWNER DECISION, same two CRs. Production and
+# staging may point at the same managed backend (tagged by environment/resource attributes) or at
+# separate LGTM installs; either way this is one value to fill in once the decision is made.
+apiVersion: opentelemetry.io/v1alpha1
+kind: Instrumentation
+metadata:
+  name: nodejs
+  namespace: treelink
+spec:
+  exporter:
+    endpoint: https://REPLACE_ME-otlp-endpoint:4318
+---
+apiVersion: opentelemetry.io/v1alpha1
+kind: Instrumentation
+metadata:
+  name: nodejs-media
+  namespace: treelink
+spec:
+  exporter:
+    endpoint: https://REPLACE_ME-otlp-endpoint:4318

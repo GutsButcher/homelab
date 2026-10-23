@@ -1,0 +1,13 @@
+# REPLACE_ME: the production hostname (apps/treelink/envs/README.md, "owner fills" row "zone").
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: treelink
+spec:
+  template:
+    spec:
+      containers:
+        - name: treelink
+          env:
+            - name: APP_URL
+              value: https://REPLACE_ME-production.example.com

@@ -1,0 +1,13 @@
+---
+# The dev tier has no PDB for the media service either (apps/treelink/base/media has an HPA but no
+# PDB). Same reasoning as pdb-web.yaml.
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: treelink-media
+  namespace: treelink
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: treelink-media

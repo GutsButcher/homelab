@@ -1,0 +1,47 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+# Staging: TDR-0003 §G, "small sizes, same manifests as Production with an overlay". Every merge
+# to main deploys here automatically (../argocd/treelink-staging.yaml) once an owner wires it up;
+# the full e2e suite, security scans and migration rehearsals run against this environment before
+# anything promotes to production. See ../README.md for the complete "owner fills" list this
+# overlay depends on before it can actually run.
+resources:
+  - ../../base
+  - secrets-placeholder.yaml
+  - backup-s3-secret-placeholder.yaml
+  - media-secrets-placeholder.yaml
+  - object-storage-config.yaml
+  - ingress-cloudflare-tunnel.yaml
+  # Option B instead of Option A above — see ../README.md "Ingress: tunnel vs. load balancer".
+  # Keep exactly one of the two ingress-*.yaml files active.
+  # - ingress-loadbalancer.yaml
+
+components:
+  - ../_components/hardening
+
+patches:
+  - path: patch-cnpg.yaml
+    target:
+      group: postgresql.cnpg.io
+      kind: Cluster
+      name: treelink-db
+  - path: patch-hostnames.yaml
+    target:
+      kind: Deployment
+      name: treelink
+  - path: patch-instrumentation.yaml
+  - path: patch-staging-sizing.yaml
+    target:
+      group: autoscaling
+      kind: HorizontalPodAutoscaler
+      name: treelink
+
+images:
+  # Staging deploys the latest green CI tag directly (TDR-0003 §G: "every merge to main deploys
+  # via GitOps"). Production promotes a specific one of these by digest after staging's gates pass
+  # (../production/kustomization.yaml) — this is the "image digest promotion from staging" leg of
+  # the production safeguard chain in docs/ENVIRONMENTS.md.
+  - name: gitea.gwynbliedd.com/gwynbliedd/treelink
+    newTag: REPLACE_ME # e.g. sha-<short sha> of a commit CI built and scanned green
+  - name: gitea.gwynbliedd.com/gwynbliedd/treelink-media
+    newTag: REPLACE_ME

@@ -1,0 +1,89 @@
+---
+# Option A — Cloudflare Tunnel (kept as the active choice in kustomization.yaml: this is how the
+# dev tier already reaches treelink.gwynbliedd.com, docs/DEPLOYMENT.md "Public hostname"). No
+# public-facing LoadBalancer/Ingress needed; cloudflared dials out to Cloudflare's edge. Pick this
+# over Option B (ingress-loadbalancer.yaml) when the new infrastructure should not expose a public
+# IP directly, or to reuse the same operational pattern as the dev tier.
+#
+# PLACEHOLDER: TUNNEL_TOKEN comes from creating the tunnel in the Cloudflare Zero Trust dashboard
+# (Networks → Tunnels), the same one-time manual step as docs/DEPLOYMENT.md "First-time setup"
+# describes for the dev tier, done again for this environment's own tunnel and hostname. Owner
+# fills: ../README.md row "tunnel token or LB IP".
+apiVersion: v1
+kind: Secret
+metadata:
+  name: treelink-cloudflare-tunnel
+  namespace: treelink
+  labels:
+    treelink.io/placeholder: "true"
+type: Opaque
+stringData:
+  TUNNEL_TOKEN: "REPLACE_ME"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cloudflared
+  namespace: treelink
+  labels:
+    app: cloudflared
+spec:
+  replicas: 2 # cloudflared itself is stateless; 2 for availability during node maintenance
+  selector:
+    matchLabels:
+      app: cloudflared
+  template:
+    metadata:
+      labels:
+        app: cloudflared
+        # Matches the ingress rule in ../_components/hardening/networkpolicy-web.yaml. Applying the
+        # same label to this Pod (rather than only a namespace label) works if cloudflared shares
+        # the treelink namespace, as it does here; if it is moved to its own namespace instead,
+        # label that namespace `treelink.io/edge-ingress=allow` as the policy comment describes.
+        treelink.io/edge-ingress: "allow"
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: cloudflared
+          image: docker.io/cloudflare/cloudflared:2025.9.0
+          imagePullPolicy: IfNotPresent
+          args: ["tunnel", "--no-autoupdate", "run"]
+          env:
+            - name: TUNNEL_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: treelink-cloudflare-tunnel
+                  key: TUNNEL_TOKEN
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              memory: 256Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          livenessProbe:
+            httpGet:
+              path: /ready
+              port: 2000
+            periodSeconds: 10
+            failureThreshold: 3
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: cloudflared
+  namespace: treelink
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: cloudflared

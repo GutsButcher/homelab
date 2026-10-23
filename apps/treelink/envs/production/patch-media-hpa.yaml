@@ -1,0 +1,14 @@
+# TDR-0003 §F: "services with HPA (min 2 replicas each in Production)". The dev-tier media HPA
+# (apps/treelink/base/media/hpa.yaml) starts at 1 because the homelab is a two-node cluster with a
+# single media-capable node (nodeSelector kubernetes.io/hostname: node01) — raise minReplicas here
+# only once production actually has more than one node able to run the media Deployment; otherwise
+# this patch just makes the second replica Pending forever. Remove the nodeSelector in a production
+# patch to the Deployment once there is more than one eligible node (not included here — depends on
+# the new cluster's node pool layout, an owner decision this skeleton cannot make).
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: treelink-media
+spec:
+  minReplicas: 2
+  maxReplicas: 4

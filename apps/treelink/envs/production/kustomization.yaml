@@ -1,0 +1,48 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+# Production: TDR-0003 §F/§G. Promoted from staging by image digest after green gates and a manual
+# approval (../argocd/treelink-production.yaml has syncPolicy left out — manual sync only, see that
+# file). See ../README.md for the complete "owner fills" list this overlay depends on, and
+# docs/LAUNCH-GATES.md (treelink repo) for what must be true before this is ever synced for real.
+resources:
+  - ../../base
+  - secrets-placeholder.yaml
+  - backup-s3-secret-placeholder.yaml
+  - media-secrets-placeholder.yaml
+  - object-storage-config.yaml
+  - ingress-cloudflare-tunnel.yaml
+  # - ingress-loadbalancer.yaml   # Option B instead of Option A — see ../README.md. Whatever is
+  #                                 chosen here MUST be the same choice as ../staging, so a staging
+  #                                 rehearsal of DNS/TLS/edge rules actually proves the production path.
+
+components:
+  - ../_components/hardening
+
+patches:
+  - path: patch-cnpg.yaml
+    target:
+      group: postgresql.cnpg.io
+      kind: Cluster
+      name: treelink-db
+  - path: patch-hostnames.yaml
+    target:
+      kind: Deployment
+      name: treelink
+  - path: patch-instrumentation.yaml
+  - path: patch-media-hpa.yaml
+    target:
+      group: autoscaling
+      kind: HorizontalPodAutoscaler
+      name: treelink-media
+
+images:
+  # Promotion by digest (TDR-0003 §G, docs/ENVIRONMENTS.md production safeguards): this is NOT a
+  # tag. Copy the digest of the exact image that ran in staging through its full gate list
+  # (docs/LAUNCH-GATES.md) — never rebuild, never retag. `docker buildx imagetools inspect
+  # gitea.gwynbliedd.com/gwynbliedd/treelink:<staging-tag> | grep Digest`, or read it back from the
+  # staging cluster: `kubectl -n treelink get pod -l app=treelink -o jsonpath='{.items[0].status.
+  # containerStatuses[0].imageID}'`.
+  - name: gitea.gwynbliedd.com/gwynbliedd/treelink
+    digest: "sha256:REPLACE_ME"
+  - name: gitea.gwynbliedd.com/gwynbliedd/treelink-media
+    digest: "sha256:REPLACE_ME"
