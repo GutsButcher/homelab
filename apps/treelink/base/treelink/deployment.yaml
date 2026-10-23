@@ -41,8 +41,33 @@ spec:
           ports:
             - name: http
               containerPort: 3000
+          # T-14/E3: force TLS on the database connection. CNPG already issues and auto-renews a
+          # server certificate from its own internal CA for every Cluster (verified live,
+          # 2026-10-03: Secret/treelink-db-ca, Secret/treelink-db-server exist and
+          # Cluster/treelink-db's status.certificates lists both, expiring 2026-12-23, alongside
+          # ssl_min/max_protocol_version: TLSv1.3 already set in spec.postgresql.parameters) — no
+          # cert-manager involvement; infrastructure/cert-manager in this repo is unused
+          # (its own README: "currently empty... reserved for future"). What was missing is the
+          # CLIENT side: the `postgres` npm driver this app uses (node_modules/postgres) defaults
+          # to `ssl: false` — no TLS attempt at all — unless the connection string's query string
+          # sets `sslmode` (traced in node_modules/postgres/src/index.js and connection.js; this
+          # is why the open finding says "DB connection without TLS" even though the server has
+          # been TLS-capable all along). CNPG's generated treelink-db-app Secret's `uri` key is a
+          # plain DSN with no query string, so DATABASE_URL is read here under a different name
+          # and the command below appends `sslmode=require` before exec'ing the server — this
+          # changes nothing in the treelink repository, only how this container is launched.
+          # `exec` keeps node as PID 1 so NEXT_MANUAL_SIG_HANDLE's SIGTERM handling
+          # (src/lib/bootstrap.ts) is unaffected.
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              case "$DATABASE_URL_BASE" in
+                *\?*) export DATABASE_URL="${DATABASE_URL_BASE}&sslmode=require" ;;
+                *) export DATABASE_URL="${DATABASE_URL_BASE}?sslmode=require" ;;
+              esac
+              exec node server.js
           env:
-            - name: DATABASE_URL
+            - name: DATABASE_URL_BASE
               valueFrom:
                 secretKeyRef:
                   name: treelink-db-app
