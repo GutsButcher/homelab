@@ -161,6 +161,17 @@ spec:
                 # Unlike `bench new-site`, a failed `install-app` here leaves
                 # the existing site intact.
                 installed="$(bench --site "$SITE_NAME" list-apps 2>/dev/null || true)"
+                # The old image can reconcile this manifest safely before the
+                # new image arrives. Never request an app absent from the image.
+                if [ -d apps/solvronix_desk ]; then
+                  if ! echo "$installed" | grep -qw solvronix_desk; then
+                    # Fail closed: no theme installation without a full backup.
+                    bench --site "$SITE_NAME" backup --with-files
+                  fi
+                  mkdir -p sites/assets
+                  ln -sfn /home/frappe/frappe-bench/apps/solvronix_desk/solvronix_desk/public sites/assets/solvronix_desk
+                  INSTALL_APPS="$INSTALL_APPS solvronix_desk"
+                fi
                 for app in $INSTALL_APPS; do
                   if echo "$installed" | grep -qw "$app"; then
                     echo "  ok      $app"
