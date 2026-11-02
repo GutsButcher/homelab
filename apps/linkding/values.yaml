@@ -15,4 +15,6 @@ common:
     volumes:
       - name: "data"
         size: "5Gi"
+        # PVC is declared in prod/linkding/pvc.yaml (the chart cannot annotate it).
+        pvcClaim: "linkding-data"
         containerMount: "/etc/linkding/data"

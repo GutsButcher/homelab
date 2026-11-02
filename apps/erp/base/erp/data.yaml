@@ -217,6 +217,9 @@ apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: erp-redis-queue
+  annotations:
+    # Keep data when the Application is deleted/disabled (see argocd/README.md).
+    argocd.argoproj.io/sync-options: Delete=false
   namespace: erp
 spec:
   accessModes: ["ReadWriteOnce"]

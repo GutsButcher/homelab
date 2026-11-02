@@ -3,6 +3,8 @@ kind: Namespace
 metadata:
   name: erp
   annotations:
+    # Keep data when the Application is deleted/disabled (see argocd/README.md).
+    argocd.argoproj.io/sync-options: Delete=false
     # Earliest wave: everything else in this application is created inside it,
     # including the wave -2 bootstrap identity.
     argocd.argoproj.io/sync-wave: "-3"

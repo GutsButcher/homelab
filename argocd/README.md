@@ -118,6 +118,27 @@ Any other chart that generates its own credentials will need one of these two tr
 Prefer the `existingSecret` + SealedSecret route: `ignoreDifferences` leaves the repo
 describing something other than what is running.
 
+## Disabling an application (keeping its data)
+
+`root` reads only `*.yaml` / `*.yml` / `*.json` under `argocd/applications/`, so renaming
+`<app>.yaml` to `<app>.yaml_disabled` (or moving it to `parked/`) makes `root` prune the
+Application, and its `resources-finalizer` deletes everything the app deployed.
+
+Anything holding data carries `argocd.argoproj.io/sync-options: Delete=false`, which Argo CD
+honours on app deletion, so it is **left in the cluster**:
+
+- the app's `Namespace` (otherwise namespace deletion takes every PVC with it)
+- every Argo-tracked `PersistentVolumeClaim` (chart PVCs get it via values, or are declared
+  in the overlay when the chart can't annotate them — see `apps/linkding`)
+- every CNPG `Cluster` (its PVCs are owned by the Cluster and are garbage-collected with it)
+
+StatefulSet `volumeClaimTemplates` PVCs aren't tracked by Argo CD and survive as long as the
+namespace does. Retained CNPG clusters keep running; hibernate them with
+`kubectl annotate cluster <name> -n <ns> cnpg.io/hibernation=on` (pods stop, PVCs stay).
+
+Rename the file back to re-enable: Argo CD re-adopts the retained objects in place.
+**Add `Delete=false` to any new stateful resource**, or disabling its app destroys the data.
+
 ## Leftovers from Flux
 
 Swept on 2026-08-21:

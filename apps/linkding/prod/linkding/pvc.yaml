@@ -1,0 +1,19 @@
+# Was rendered by the chart; declared here so it can carry Delete=false.
+# Same name as the chart's PVC, so Argo CD adopts the existing claim.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: linkding-data
+  namespace: linkding
+  labels:
+    app: linkding
+  annotations:
+    # Keep data when the Application is deleted/disabled (see argocd/README.md).
+    argocd.argoproj.io/sync-options: Delete=false
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 5Gi

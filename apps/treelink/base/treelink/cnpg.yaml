@@ -5,6 +5,9 @@ apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
   name: treelink-db
+  annotations:
+    # Keep data when the Application is deleted/disabled (see argocd/README.md).
+    argocd.argoproj.io/sync-options: Delete=false
   namespace: treelink
 spec:
   instances: 1

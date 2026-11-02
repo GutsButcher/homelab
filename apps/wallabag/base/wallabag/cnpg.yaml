@@ -4,6 +4,9 @@ apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
   name: postgres-cluster
+  annotations:
+    # Keep data when the Application is deleted/disabled (see argocd/README.md).
+    argocd.argoproj.io/sync-options: Delete=false
   namespace: wallabag
 spec:
   instances: 1  # Can be increased for HA

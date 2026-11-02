@@ -12,7 +12,9 @@ persistentVolume:
 
   ## pgAdmin4 Persistent Volume Claim annotations
   ##
-  annotations: {}
+  annotations:
+    # Keep data when the Application is deleted/disabled (see argocd/README.md).
+    argocd.argoproj.io/sync-options: Delete=false
 
   ## pgAdmin4 Persistent Volume access modes
   ## Must match those of existing PV or dynamic provisioner
