@@ -166,7 +166,7 @@ spec:
                 if [ -d apps/nexus_theme ]; then
                   # The image retains legacy schema but removes its UI hooks.
                   # Backup + verified receipts precede every first activation.
-                  env/bin/python apps/nexus_theme/nexus_theme/deployment.py prepare "$SITE_NAME"
+                  env/bin/python -m nexus_theme.deployment prepare "$SITE_NAME"
                   INSTALL_APPS="$INSTALL_APPS solvronix_desk nexus_theme"
                 elif [ -d apps/solvronix_desk ]; then
                   if ! echo "$installed" | grep -qw solvronix_desk; then
