@@ -163,7 +163,12 @@ spec:
                 installed="$(bench --site "$SITE_NAME" list-apps 2>/dev/null || true)"
                 # The old image can reconcile this manifest safely before the
                 # new image arrives. Never request an app absent from the image.
-                if [ -d apps/solvronix_desk ]; then
+                if [ -d apps/nexus_theme ]; then
+                  # The image retains legacy schema but removes its UI hooks.
+                  # Backup + verified receipts precede every first activation.
+                  bench --site "$SITE_NAME" execute nexus_theme.deployment.prepare
+                  INSTALL_APPS="$INSTALL_APPS solvronix_desk nexus_theme"
+                elif [ -d apps/solvronix_desk ]; then
                   if ! echo "$installed" | grep -qw solvronix_desk; then
                     # Fail closed: no theme installation without a full backup.
                     bench --site "$SITE_NAME" backup --with-files
@@ -182,6 +187,9 @@ spec:
                 done
 
                 bench --site "$SITE_NAME" migrate
+                if [ -d apps/nexus_theme ]; then
+                  bench --site "$SITE_NAME" execute nexus_theme.deployment.activate
+                fi
                 exit 0
               fi
 
