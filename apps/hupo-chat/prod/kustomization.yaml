@@ -4,7 +4,8 @@
   "namespace": "hupo-chat",
   "resources": [
     "../base",
-    "ingressroute.yaml"
+    "ingressroute.yaml",
+    "owner-identity.sealed.json"
   ],
   "patches": [
     {

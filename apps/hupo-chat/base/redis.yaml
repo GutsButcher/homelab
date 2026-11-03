@@ -10,6 +10,7 @@
   "spec": {
     "serviceName": "hupo-chat-redis",
     "replicas": 1,
+    "persistentVolumeClaimRetentionPolicy": {"whenDeleted": "Retain", "whenScaled": "Retain"},
     "selector": {
       "matchLabels": {
         "app.kubernetes.io/name": "hupo-chat",
@@ -26,6 +27,7 @@
         }
       },
       "spec": {
+        "nodeSelector": {"kubernetes.io/hostname": "node01"},
         "serviceAccountName": "hupo-chat",
         "automountServiceAccountToken": false,
         "terminationGracePeriodSeconds": 60,
@@ -149,10 +151,11 @@
         "metadata": {
           "name": "data",
           "annotations": {
-            "argocd.argoproj.io/sync-options": "Delete=false"
+            "argocd.argoproj.io/sync-options": "Prune=false,Delete=false"
           }
         },
         "spec": {
+          "storageClassName": "local-path",
           "accessModes": [
             "ReadWriteOnce"
           ],

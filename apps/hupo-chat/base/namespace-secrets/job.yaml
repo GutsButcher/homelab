@@ -1,0 +1,100 @@
+{
+  "apiVersion": "batch/v1",
+  "kind": "Job",
+  "metadata": {
+    "name": "hupo-chat-namespace-secrets",
+    "namespace": "hupo-chat",
+    "annotations": {
+      "argocd.argoproj.io/sync-wave": "-35",
+      "argocd.argoproj.io/hook": "Sync",
+      "argocd.argoproj.io/hook-delete-policy": "BeforeHookCreation"
+    }
+  },
+  "spec": {
+    "backoffLimit": 0,
+    "activeDeadlineSeconds": 180,
+    "ttlSecondsAfterFinished": 600,
+    "template": {
+      "metadata": {
+        "labels": {
+          "app.kubernetes.io/name": "hupo-chat-namespace-secrets",
+          "app.kubernetes.io/part-of": "hupo-chat",
+          "app.kubernetes.io/component": "namespace-secrets"
+        }
+      },
+      "spec": {
+        "serviceAccountName": "hupo-chat-namespace-secrets",
+        "automountServiceAccountToken": false,
+        "nodeSelector": {"kubernetes.io/hostname": "node01"},
+        "restartPolicy": "Never",
+        "terminationGracePeriodSeconds": 10,
+        "securityContext": {
+          "runAsNonRoot": true,
+          "runAsUser": 1000,
+          "runAsGroup": 1000,
+          "fsGroup": 1000,
+          "fsGroupChangePolicy": "OnRootMismatch",
+          "seccompProfile": {"type": "RuntimeDefault"}
+        },
+        "containers": [
+          {
+            "name": "namespace-secrets",
+            "image": "chatwoot/chatwoot:v4.19.1-ce@sha256:04895c7bd0550d9e74b45b7202787b56f7ee4e891ebbde0c429c8c32901b97cf",
+            "imagePullPolicy": "IfNotPresent",
+            "command": ["ruby", "/opt/hupo-chat-namespace-secrets/generate.rb", "--run-in-cluster"],
+            "workingDir": "/opt/hupo-chat-namespace-secrets",
+            "env": [
+              {"name": "RUBYOPT", "value": ""},
+              {"name": "RUBYLIB", "value": ""},
+              {"name": "RUBY_YJIT_ENABLE", "value": "0"}
+            ],
+            "securityContext": {
+              "allowPrivilegeEscalation": false,
+              "readOnlyRootFilesystem": true,
+              "capabilities": {"drop": ["ALL"]}
+            },
+            "resources": {
+              "requests": {"cpu": "25m", "memory": "64Mi"},
+              "limits": {"cpu": "250m", "memory": "192Mi"}
+            },
+            "volumeMounts": [
+              {"name": "code", "mountPath": "/opt/hupo-chat-namespace-secrets", "readOnly": true},
+              {"name": "identity", "mountPath": "/var/run/hupo-chat-owner-identity", "readOnly": true},
+              {"name": "api-access", "mountPath": "/var/run/hupo-chat-api", "readOnly": true}
+            ]
+          }
+        ],
+        "volumes": [
+          {
+            "name": "code",
+            "configMap": {"name": "hupo-chat-namespace-secrets-code", "defaultMode": 292}
+          },
+          {
+            "name": "identity",
+            "secret": {"secretName": "hupo-chat-owner-identity", "optional": false, "defaultMode": 288}
+          },
+          {
+            "name": "api-access",
+            "projected": {
+              "defaultMode": 288,
+              "sources": [
+                {
+                  "serviceAccountToken": {
+                    "path": "token", "expirationSeconds": 600,
+                    "audience": "https://kubernetes.default.svc.cluster.local"
+                  }
+                },
+                {
+                  "configMap": {
+                    "name": "kube-root-ca.crt", "optional": false,
+                    "items": [{"key": "ca.crt", "path": "ca.crt"}]
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    }
+  }
+}

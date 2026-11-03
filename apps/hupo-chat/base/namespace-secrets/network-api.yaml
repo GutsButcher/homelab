@@ -1,0 +1,54 @@
+{
+  "apiVersion": "networking.k8s.io/v1",
+  "kind": "NetworkPolicy",
+  "metadata": {
+    "name": "hupo-chat-namespace-secrets-api",
+    "namespace": "hupo-chat",
+    "annotations": {
+      "argocd.argoproj.io/sync-wave": "-38",
+      "hupo.chat/api-egress-source": "hupo-chat-preflight-bounded-allowset"
+    }
+  },
+  "spec": {
+    "podSelector": {"matchLabels": {"app.kubernetes.io/name": "hupo-chat-namespace-secrets"}},
+    "policyTypes": ["Ingress", "Egress"],
+    "ingress": [],
+    "egress": [
+      {
+        "to": [
+          {
+            "ipBlock": {
+              "cidr": "10.43.0.1/32"
+            }
+          }
+        ],
+        "ports": [
+          {
+            "protocol": "TCP",
+            "port": 443
+          }
+        ]
+      },
+      {
+        "to": [
+          {
+            "ipBlock": {
+              "cidr": "192.168.100.191/32"
+            }
+          },
+          {
+            "ipBlock": {
+              "cidr": "192.168.100.229/32"
+            }
+          }
+        ],
+        "ports": [
+          {
+            "protocol": "TCP",
+            "port": 6443
+          }
+        ]
+      }
+    ]
+  }
+}

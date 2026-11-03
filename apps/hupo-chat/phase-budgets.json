@@ -1,0 +1,159 @@
+{
+  "schemaVersion": 1,
+  "namespace": "hupo-chat",
+  "targetNode": "node01",
+  "scope": "Manifest inputs only. Sync hooks do not overlap. Existing steady pods remain on repeat sync.",
+  "pvcBytes": 45097156608,
+  "phases": [
+    {
+      "name": "generator_first_install",
+      "wave": -35,
+      "workloads": [
+        "hupo-chat-namespace-secrets"
+      ],
+      "requests": {
+        "cpuMilli": 25,
+        "memoryBytes": 67108864
+      },
+      "limits": {
+        "cpuMilli": 250,
+        "memoryBytes": 201326592
+      },
+      "emptyDirBytes": 0
+    },
+    {
+      "name": "data_first_install",
+      "wave": -20,
+      "workloads": [
+        "hupo-chat-postgres",
+        "hupo-chat-redis"
+      ],
+      "requests": {
+        "cpuMilli": 350,
+        "memoryBytes": 335544320
+      },
+      "limits": {
+        "cpuMilli": 1500,
+        "memoryBytes": 1610612736
+      },
+      "emptyDirBytes": 285212672
+    },
+    {
+      "name": "prepare_first_install",
+      "wave": -10,
+      "workloads": [
+        "hupo-chat-postgres",
+        "hupo-chat-redis",
+        "hupo-chat-prepare"
+      ],
+      "requests": {
+        "cpuMilli": 600,
+        "memoryBytes": 1140850688
+      },
+      "limits": {
+        "cpuMilli": 3500,
+        "memoryBytes": 3758096384
+      },
+      "emptyDirBytes": 956301312
+    },
+    {
+      "name": "owner_first_install",
+      "wave": -5,
+      "workloads": [
+        "hupo-chat-postgres",
+        "hupo-chat-redis",
+        "hupo-chat-owner-bootstrap"
+      ],
+      "requests": {
+        "cpuMilli": 600,
+        "memoryBytes": 1140850688
+      },
+      "limits": {
+        "cpuMilli": 3500,
+        "memoryBytes": 3758096384
+      },
+      "emptyDirBytes": 956301312
+    },
+    {
+      "name": "steady",
+      "wave": 0,
+      "workloads": [
+        "hupo-chat-postgres",
+        "hupo-chat-redis",
+        "hupo-chat-web",
+        "hupo-chat-worker"
+      ],
+      "requests": {
+        "cpuMilli": 850,
+        "memoryBytes": 1946157056
+      },
+      "limits": {
+        "cpuMilli": 5500,
+        "memoryBytes": 5905580032
+      },
+      "emptyDirBytes": 1627389952
+    },
+    {
+      "name": "generator_repeat_sync",
+      "wave": -35,
+      "workloads": [
+        "hupo-chat-postgres",
+        "hupo-chat-redis",
+        "hupo-chat-web",
+        "hupo-chat-worker",
+        "hupo-chat-namespace-secrets"
+      ],
+      "requests": {
+        "cpuMilli": 875,
+        "memoryBytes": 2013265920
+      },
+      "limits": {
+        "cpuMilli": 5750,
+        "memoryBytes": 6106906624
+      },
+      "emptyDirBytes": 1627389952
+    },
+    {
+      "name": "prepare_repeat_sync",
+      "wave": -10,
+      "workloads": [
+        "hupo-chat-postgres",
+        "hupo-chat-redis",
+        "hupo-chat-web",
+        "hupo-chat-worker",
+        "hupo-chat-prepare"
+      ],
+      "requests": {
+        "cpuMilli": 1100,
+        "memoryBytes": 2751463424
+      },
+      "limits": {
+        "cpuMilli": 7500,
+        "memoryBytes": 8053063680
+      },
+      "emptyDirBytes": 2298478592
+    },
+    {
+      "name": "owner_repeat_sync",
+      "wave": -5,
+      "workloads": [
+        "hupo-chat-postgres",
+        "hupo-chat-redis",
+        "hupo-chat-web",
+        "hupo-chat-worker",
+        "hupo-chat-owner-bootstrap"
+      ],
+      "requests": {
+        "cpuMilli": 1100,
+        "memoryBytes": 2751463424
+      },
+      "limits": {
+        "cpuMilli": 7500,
+        "memoryBytes": 8053063680
+      },
+      "emptyDirBytes": 2298478592
+    }
+  ],
+  "peakMemoryLimitBytes": 8053063680,
+  "peakEmptyDirBytes": 2298478592
+}

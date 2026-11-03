@@ -1,0 +1,25 @@
+{
+  "apiVersion": "networking.k8s.io/v1",
+  "kind": "NetworkPolicy",
+  "metadata": {
+    "name": "hupo-chat-namespace-secrets-dns",
+    "namespace": "hupo-chat",
+    "annotations": {"argocd.argoproj.io/sync-wave": "-38"}
+  },
+  "spec": {
+    "podSelector": {"matchLabels": {"app.kubernetes.io/name": "hupo-chat-namespace-secrets"}},
+    "policyTypes": ["Ingress", "Egress"],
+    "ingress": [],
+    "egress": [
+      {
+        "to": [
+          {
+            "namespaceSelector": {"matchLabels": {"kubernetes.io/metadata.name": "kube-system"}},
+            "podSelector": {"matchLabels": {"k8s-app": "kube-dns"}}
+          }
+        ],
+        "ports": [{"port": 53, "protocol": "UDP"}, {"port": 53, "protocol": "TCP"}]
+      }
+    ]
+  }
+}

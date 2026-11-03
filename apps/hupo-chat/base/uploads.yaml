@@ -5,10 +5,11 @@
     "name": "hupo-chat-uploads",
     "annotations": {
       "argocd.argoproj.io/sync-wave": "0",
-      "argocd.argoproj.io/sync-options": "Delete=false"
+      "argocd.argoproj.io/sync-options": "Prune=false,Delete=false"
     }
   },
   "spec": {
+    "storageClassName": "local-path",
     "accessModes": [
       "ReadWriteOnce"
     ],

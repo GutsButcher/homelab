@@ -32,6 +32,7 @@
         }
       },
       "spec": {
+        "nodeSelector": {"kubernetes.io/hostname": "node01"},
         "serviceAccountName": "hupo-chat",
         "automountServiceAccountToken": false,
         "securityContext": {

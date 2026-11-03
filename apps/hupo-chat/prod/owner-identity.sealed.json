@@ -1,0 +1,24 @@
+{
+  "apiVersion": "bitnami.com/v1alpha1",
+  "kind": "SealedSecret",
+  "metadata": {
+    "name": "hupo-chat-owner-identity",
+    "namespace": "hupo-chat",
+    "annotations": {
+      "argocd.argoproj.io/sync-wave": "-39"
+    }
+  },
+  "spec": {
+    "encryptedData": {
+      "OWNER_EMAIL": "AgBpqllT774XSyZPh8UNsb4nHtQPDPAxE9qD02f2q1Aqh97THhnp9NTqu/C1kisqa6Ls2e/1bmLyPJ9jJ0WoRcpn0vn2cXTzH/iWlkj3UEuE3MbTqSbzEoJ6sseMyczRB8xuU+mgPdFc3XH0nyrjMZP3nGWJ7qphltvY3HiJZDTQMXV0AmCJLuaoJomzHoftbulKElWSCU9Jd06Wf2TxTnzRk2/Q1yGH9uAOwBYydNEglEZcBQAH+v6SBM+2+Oh8j5SNvzCZvUAyxZpgAiri2n5w20cxjfQBkJR7Dgn964qgha0uzgGn/uhaJtmgZYZFaXkyG3J8My2i++X79rrdqQA0QIuj6HgMdP7IbbJIm/8q8qcTLt0xXegiew7Y60mW0nj++Ego8EQg1I0QcTC2Z8swvm7ZPebBGyTLsRpq7euO0sY+DDzLVWLXrHSLDqSYfPSeRTCpSFyDpxuBCFYQa67CpIdJJWlWmsLMUt5DFEC37+pSwgXM/hL75ymdwMjgHhK7DD1h7K2LVqnp90xvg1/XbhA1AGGA1bG4OPyB3WVA7S/QgGOshJtaGRtV2Sqtahmm49blYj9+rxcf9gGQ1/To1ekXFh9SBMACgo8RUSCOjbBTMICt90OTuB4DFbe8XxUlM+bmRn0NqmTxZShTwenj5OaXXFlzeTQNCMWtCerlcscV/b6841ump7pT0i1M62p29o2nJuuRX+nDy00/tlkjKM7JUAe+Hg==",
+      "OWNER_EMAIL_VERIFIED": "AgCoXHBb9MDomBVQoyeJz10oTGe55iSgpX21vbZPdauBniPky0prdqgLYz5C+g4ZLiqHX92obPmtN3kS9GPYavOEA7wJnydPmArkDMA5I8lL8duyfWTMhYWxWu3kfQNtLV7Gr38AP0qkHbnWtGkKXtGbVH6OTCzGsLoZWc30vX7nR5sg3Rwb0SYu702vgXsLkYkFSTwBnGFFyYZ/8iY1uvhfe2qC1g0nTMVNGvwOLgJcFfVLgmA5de8RaHEff1n62zgW7fuagD8wrV/7N/fEsW/VoM1ZCtAcxqVvKNkic4Alcj/up5VaUyTqbgfqBofC/9A0BYHFiAEvfQKgp1rM/TbDp4i0hzNWxvTLUqOH64ZkP5cglDmoTCYoOTc59QeFWt4Wu5dpPSC7wsB8NdJmK6HNGEOjooL1MLSDF5CgNZe+p0c2Szrn9lnrTxu25AfQSKZhGsNUP5IPqQcBERaCcrXlQGuFa9jhHpKTJuc7iEj5NAIw517R6yltPz0CMyY1bCSCkJ21mkpj8NlFJEjSgcKJ6CNIbf0qaxQAbdUAxyzIKtXM4N84HTKIFnfkom4VfJeByvgZUietzDOrGWAevKmIjbgapbG2l4sHjt2+ZgsNhhNSQzUIp7bzD86WUi2Y7Jo9FJ3okn71mz3ux3Zcfut+cT/L7C97gOxcV3BSbgSbpWm4jGfzoOjWzfDI+vVWjdU5UByS"
+    },
+    "template": {
+      "type": "Opaque",
+      "metadata": {
+        "name": "hupo-chat-owner-identity",
+        "namespace": "hupo-chat"
+      }
+    }
+  }
+}
