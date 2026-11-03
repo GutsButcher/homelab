@@ -23,6 +23,14 @@ methods return 405 internally (unmatched at ingress). HEAD has no body. Requests
 only read cache: no request data controls backend URLs, paths, refresh or files.
 Responses use `no-store`; external cache behavior must still be checked later.
 
+Only a successful `/certificate` GET/HEAD with the internally marked authenticated
+API provider and an available validated certificate carries
+`X-Hupo-Certificate-Source: kubernetes-api-service-proxy-v1`. Unknown/injected
+providers do not inherit this mark. 503 and other endpoints never carry it.
+The receipt identifies this runtime read path, not a new certificate trust chain
+or proof that a candidate revision has been activated. Activation still requires
+observing the header and checking the served certificate fingerprint.
+
 ## Exact public JSON contract
 
 The following is a **contract template, not a real cluster observation**:
@@ -94,17 +102,26 @@ work retains the refresh lock until settled; late success cannot overwrite failu
   and enacted/in-flight resize resources. Pod pagination is complete or fails
   closed: at most 100 pages, 100 requested items/page, 2MiB/body. Pod specs/env,
   tokens, private IPs and usernames never enter the public report.
-- RBAC grants only named-node GET, pod LIST and named-node metrics GET. No API
-  writes, secrets/config reads, logs, exec, proxy or wildcard verbs. An explicitly
-  projected short-lived token/namespace CA is mounted only in this SA's pod.
+- The unchanged base ClusterRole grants only named-node GET, pod LIST and
+  named-node metrics GET. The separate temporary Role described below adds only
+  GET on the named controller's `services/proxy` subresource. No API writes,
+  secrets/config reads, logs, exec or wildcard verbs. An explicitly projected
+  short-lived token/namespace CA is mounted only in this SA's pod.
   TLS uses that CA, fixed API hostname and hostname verification; no redirects.
-- Only the existing **public** certificate is fetched without authorization from
-  `http://sealed-secrets-controller.sealed-secrets.svc.cluster.local:8080/v1/cert.pem`.
+- Only the existing **public** certificate is fetched by the default provider via
+  verified HTTPS to `kubernetes.default.svc.cluster.local:443` at the fixed path
+  `/api/v1/namespaces/sealed-secrets/services/sealed-secrets-controller:8080/proxy/v1/cert.pem`.
+  The bearer goes only to the API server, never to direct controller HTTP.
+  This read uses the existing 3.5-second deadline and a 32KiB response bound.
+  Denial, redirects, TLS/transport failures and oversized bodies fail closed;
+  there is no anonymous fallback. The old direct-public-fetch helper remains
+  for compatibility/tests, not default provenance.
   It must be a single currently valid RSA X509 certificate, 2048–8192 bits with
   exponent at least 65537. Private/appended PEM content is rejected; output is
   canonical public X509 only. Expiry is checked again when serving. The certificate
   can remain available when capacity fails. No key generation/export or credentials
-  escrow exists. Parsing is not a new trust chain or proof of controller identity.
+  escrow exists. Parsing alone is not a new trust chain or proof of controller
+  identity. The authenticated API hop is not end-to-end controller TLS.
 - NetworkPolicy admits Traefik only; egress is CoreDNS, the Kubernetes API's
   explicit service/control-plane addresses, and the fixed controller namespace +
   chart labels/port. Controller namespace/release/labels follow chart **2.16.2** and
@@ -120,6 +137,27 @@ working-set metrics, CPU requests and a disk reserve cannot predict future burst
 images/log growth, scaling, pending workloads, other PVCs or storage paths. The
 preflight itself has a small bounded footprint; it does not reserve planned capacity.
 
+## Temporary certificate-read permission
+
+`cert-reader-access/` is a standalone two-file Kustomization. It renders only a
+Role and RoleBinding named `hupo-chat-preflight-certificate-reader` in the
+**existing** `sealed-secrets` namespace. The exact rule is
+`apiGroups: [""]`, `resources: ["services/proxy"]`,
+`resourceNames: ["sealed-secrets-controller:8080"]`, `verbs: ["get"]`.
+The binding's explicit subject remains ServiceAccount `hupo-chat-preflight` in
+namespace `hupo-chat-preflight` after rendering. RBAC constrains the service
+proxy resource. The runtime also fixes the suffix to `/v1/cert.pem` and
+does not expose a general-purpose proxy.
+
+Keep this subtree out of the preflight namespace-transforming base/prod.
+Activation requires a separate Application source at this path, pinned to the
+same native-tested immutable source revision as prod. This source change does
+not register that source. Within that sync, the existing preflight
+Namespace is wave -40, its ServiceAccount -30, the separate permission -20 and
+the pod 0. The standalone subtree creates no Namespace and changes no controller
+workload. Remove the temporary permission with the preflight when no longer
+needed. Do not broaden it to work around a 403.
+
 ## Offline verification (no app/server startup)
 
 From `apps/hupo-chat-preflight`, using an already installed Node:
@@ -129,6 +167,7 @@ node --test --test-concurrency=1 tests/*.test.mjs
 kubectl kustomize base > /dev/null
 kubectl kustomize prod > /dev/null
 kubectl kustomize . > /dev/null
+kubectl kustomize cert-reader-access > /dev/null
 node tools/build-plan.mjs --check
 # Explicit source override, when needed:
 node tools/build-plan.mjs ../hupo-chat/base --check

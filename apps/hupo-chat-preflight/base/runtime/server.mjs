@@ -4,19 +4,20 @@ import { realpathSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { createHandler } from './endpoint.mjs';
 import { ReportCache, observe } from './snapshot.mjs';
-import { KubeReader, fetchPublicCertificate, readOwnDisk } from './upstream.mjs';
+import { KubeReader, fetchAuthenticatedCertificate, readOwnDisk } from './upstream.mjs';
 
 export class PreflightService {
   #timer = null;
 
-  constructor({ plan, ownNode, provider = { reader: new KubeReader(), readDisk: readOwnDisk, readCert: fetchPublicCertificate },
+  constructor({ plan, ownNode, provider = { reader: new KubeReader(), readDisk: readOwnDisk,
+    readCert: fetchAuthenticatedCertificate, certificateSource: 'kubernetes-api-service-proxy-v1' },
     makeServer = createServer, schedule = setInterval, cancel = clearInterval }) {
     this.cache = new ReportCache({ plan, clock: provider.clock || Date.now,
       collect: signal => observe(plan, ownNode, provider, signal) });
     this.schedule = schedule;
     this.cancel = cancel;
     this.server = makeServer({ requestTimeout: 5000, headersTimeout: 4000, keepAliveTimeout: 1000,
-      maxHeaderSize: 8192, connectionsCheckingInterval: 1000 }, createHandler(this.cache));
+      maxHeaderSize: 8192, connectionsCheckingInterval: 1000 }, createHandler(this.cache, { certificateSource: provider.certificateSource }));
     this.server.maxConnections = 16;
     this.server.maxRequestsPerSocket = 10;
     this.server.on('clientError', (_error, socket) => {

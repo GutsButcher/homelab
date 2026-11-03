@@ -41,3 +41,27 @@ test('only exact service GET/HEAD endpoints read cache; unhealthy capacity leave
   assert.equal(invoke(handler, 'GET', '/certificate').body, 'public-fixture\n');
   assert.equal(invoke(handler, 'HEAD', '/certificate').body, undefined);
 });
+
+test('certificate provenance requires the exact internal origin marker and an available certificate', () => {
+  const cache = { certificate: () => 'public-fixture\n' };
+  for (const certificateSource of [undefined, null, true, 'http-controller', 'kubernetes-api-service-proxy-v1\r\nInjected: yes']) {
+    const handler = endpoint.createHandler(cache, { certificateSource });
+    for (const method of ['GET', 'HEAD']) {
+      const response = invoke(handler, method, '/certificate');
+      assert.equal(response.status, 200);
+      assert.equal(response.headers['X-Hupo-Certificate-Source'], undefined);
+    }
+  }
+  const handler = endpoint.createHandler(cache, { certificateSource: 'kubernetes-api-service-proxy-v1' });
+  for (const method of ['GET', 'HEAD']) {
+    const response = invoke(handler, method, '/certificate');
+    assert.equal(response.status, 200);
+    assert.equal(response.headers['X-Hupo-Certificate-Source'], 'kubernetes-api-service-proxy-v1');
+  }
+  cache.certificate = () => null;
+  for (const method of ['GET', 'HEAD']) {
+    const response = invoke(handler, method, '/certificate');
+    assert.equal(response.status, 503);
+    assert.equal(response.headers['X-Hupo-Certificate-Source'], undefined);
+  }
+});

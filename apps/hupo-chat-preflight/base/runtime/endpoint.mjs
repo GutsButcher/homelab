@@ -1,4 +1,6 @@
-export function createHandler(cache) {
+export function createHandler(cache, { certificateSource } = {}) {
+  const provenance = certificateSource === 'kubernetes-api-service-proxy-v1' ?
+    { 'X-Hupo-Certificate-Source': 'kubernetes-api-service-proxy-v1' } : {};
   return (request, response) => {
     if (!['GET', 'HEAD'].includes(request.method)) {
       return send(request, response, 405, { error: 'METHOD_NOT_ALLOWED' }, 'application/json', { Allow: 'GET, HEAD' });
@@ -7,7 +9,7 @@ export function createHandler(cache) {
     if (request.url === '/report') return send(request, response, 200, cache.report());
     if (request.url === '/certificate') {
       const pem = cache.certificate();
-      return pem ? send(request, response, 200, pem, 'application/x-pem-file') :
+      return pem ? send(request, response, 200, pem, 'application/x-pem-file', provenance) :
         send(request, response, 503, { error: 'CERT_UNAVAILABLE' });
     }
     return send(request, response, 404, { error: 'NOT_FOUND' });

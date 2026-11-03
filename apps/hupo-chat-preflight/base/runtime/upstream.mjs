@@ -4,6 +4,7 @@ import { readFile, statfs } from 'node:fs/promises';
 
 const API_HOST = 'kubernetes.default.svc.cluster.local';
 const CERT_HOST = 'sealed-secrets-controller.sealed-secrets.svc.cluster.local';
+const CERT_API_PATH = '/api/v1/namespaces/sealed-secrets/services/sealed-secrets-controller:8080/proxy/v1/cert.pem';
 const SA_PATH = '/var/run/secrets/kubernetes.io/serviceaccount';
 const TARGET_NODE = 'node01';
 
@@ -16,12 +17,9 @@ export class KubeReader {
   async readInputs(ownNode, signal) {
     if (ownNode !== TARGET_NODE) throw new Error('NODE_UNKNOWN');
     try {
-      const [token, ca] = await Promise.all([this.read(`${SA_PATH}/token`, 'utf8'), this.read(`${SA_PATH}/ca.crt`, 'utf8')]);
-      const bearer = token.trim();
-      if (!bearer || /[\r\n]/.test(bearer) || !ca) throw new Error();
-      const get = async path => JSON.parse(await boundedGet(this.request, { hostname: API_HOST, port: 443, path,
-        servername: API_HOST, rejectUnauthorized: true, ca,
-        headers: { Accept: 'application/json', Authorization: `Bearer ${bearer}` }, signal }, 2097152, 'API_UNAVAILABLE'));
+      const options = await this.#credentials();
+      const get = async path => JSON.parse(await boundedGet(this.request, { ...options, path,
+        headers: { ...options.headers, Accept: 'application/json' }, signal }, 2097152, 'API_UNAVAILABLE'));
       const [node, metrics, pods] = await Promise.all([
         get(`/api/v1/nodes/${ownNode}`), get(`/apis/metrics.k8s.io/v1beta1/nodes/${ownNode}`), this.#pods(get, ownNode)
       ]);
@@ -30,6 +28,22 @@ export class KubeReader {
         metrics: { metadata: { name: metrics.metadata?.name }, timestamp: metrics.timestamp, window: metrics.window,
           usage: { cpu: metrics.usage?.cpu, memory: metrics.usage?.memory } }, pods };
     } catch { throw new Error('API_UNAVAILABLE'); }
+  }
+
+  async readCertificate(signal) {
+    try {
+      const options = await this.#credentials();
+      return await boundedGet(this.request, { ...options, path: CERT_API_PATH,
+        headers: { ...options.headers, Accept: 'application/x-pem-file' }, signal }, 32768, 'CERT_UNAVAILABLE');
+    } catch { throw new Error('CERT_UNAVAILABLE'); }
+  }
+
+  async #credentials() {
+    const [token, ca] = await Promise.all([this.read(`${SA_PATH}/token`, 'utf8'), this.read(`${SA_PATH}/ca.crt`, 'utf8')]);
+    const bearer = token.trim();
+    if (!bearer || /[\r\n]/.test(bearer) || !ca) throw new Error();
+    return { hostname: API_HOST, port: 443, servername: API_HOST, rejectUnauthorized: true, ca,
+      headers: { Authorization: `Bearer ${bearer}` } };
   }
 
   async #pods(get, ownNode) {
@@ -58,6 +72,10 @@ export class KubeReader {
     }
     throw new Error();
   }
+}
+
+export function fetchAuthenticatedCertificate(signal, reader = new KubeReader()) {
+  return reader.readCertificate(signal);
 }
 
 export function fetchPublicCertificate(signal, request = httpRequest) {

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { readFile, readdir } from 'node:fs/promises';
 import { plan } from './helpers.mjs';
 
 async function document(path) {
@@ -19,6 +19,39 @@ test('RBAC is read-only, exact-node constrained and has no secret, config or sub
   ]);
   const binding = doc.items.find(x => x.kind === 'ClusterRoleBinding');
   assert.deepEqual(binding.subjects, [{ kind: 'ServiceAccount', name: 'hupo-chat-preflight', namespace: 'hupo-chat-preflight' }]);
+});
+
+test('certificate reader access is a standalone exact-service GET Role in the existing controller namespace', async () => {
+  const kustomization = await document('cert-reader-access/kustomization.yaml');
+  assert.ok(kustomization, 'standalone certificate access source is missing');
+  assert.deepEqual(kustomization, { apiVersion: 'kustomize.config.k8s.io/v1beta1', kind: 'Kustomization',
+    namespace: 'sealed-secrets', resources: ['access.yaml'] });
+  assert.deepEqual((await readdir(new URL('../cert-reader-access/', import.meta.url))).sort(), ['access.yaml', 'kustomization.yaml']);
+  const access = await document('cert-reader-access/access.yaml');
+  const name = 'hupo-chat-preflight-certificate-reader';
+  const metadata = { name, namespace: 'sealed-secrets', annotations: { 'argocd.argoproj.io/sync-wave': '-20' } };
+  assert.deepEqual(access, { apiVersion: 'v1', kind: 'List', items: [
+    { apiVersion: 'rbac.authorization.k8s.io/v1', kind: 'Role', metadata,
+      rules: [{ apiGroups: [''], resources: ['services/proxy'], resourceNames: ['sealed-secrets-controller:8080'], verbs: ['get'] }] },
+    { apiVersion: 'rbac.authorization.k8s.io/v1', kind: 'RoleBinding', metadata,
+      roleRef: { apiGroup: 'rbac.authorization.k8s.io', kind: 'Role', name },
+      subjects: [{ kind: 'ServiceAccount', name: 'hupo-chat-preflight', namespace: 'hupo-chat-preflight' }] }
+  ] });
+  for (const path of ['kustomization.yaml', 'base/kustomization.yaml', 'prod/kustomization.yaml']) {
+    const base = await document(path);
+    assert.equal(JSON.stringify(base).includes('cert-reader-access'), false, 'cross-namespace access must not enter the preflight namespace transformer');
+  }
+});
+
+test('certificate permission follows the preflight ServiceAccount and precedes its pod', async () => {
+  const namespace = await document('base/namespace.yaml');
+  const sa = await document('base/service-account.yaml');
+  const deploy = await document('base/deployment.yaml');
+  const access = await document('cert-reader-access/access.yaml');
+  assert.equal(namespace.metadata.annotations['argocd.argoproj.io/sync-wave'], '-40');
+  assert.equal(sa.metadata.annotations['argocd.argoproj.io/sync-wave'], '-30');
+  assert.equal(deploy.metadata.annotations['argocd.argoproj.io/sync-wave'], '0');
+  assert.equal(access.items.every(item => item.metadata.annotations['argocd.argoproj.io/sync-wave'] === '-20'), true);
 });
 
 test('workload is a tiny pinned non-root read-only container with only its own retained PVC and projected token', async () => {
