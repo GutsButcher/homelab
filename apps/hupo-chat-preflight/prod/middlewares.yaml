@@ -1,0 +1,38 @@
+{
+  "apiVersion": "v1",
+  "kind": "List",
+  "items": [
+    {
+      "apiVersion": "traefik.io/v1alpha1",
+      "kind": "Middleware",
+      "metadata": {
+        "name": "hupo-chat-preflight-report",
+        "namespace": "hupo-chat-preflight",
+        "annotations": {
+          "argocd.argoproj.io/sync-wave": "0"
+        }
+      },
+      "spec": {
+        "replacePath": {
+          "path": "/report"
+        }
+      }
+    },
+    {
+      "apiVersion": "traefik.io/v1alpha1",
+      "kind": "Middleware",
+      "metadata": {
+        "name": "hupo-chat-preflight-certificate",
+        "namespace": "hupo-chat-preflight",
+        "annotations": {
+          "argocd.argoproj.io/sync-wave": "0"
+        }
+      },
+      "spec": {
+        "replacePath": {
+          "path": "/certificate"
+        }
+      }
+    }
+  ]
+}

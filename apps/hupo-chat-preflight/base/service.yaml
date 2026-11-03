@@ -1,0 +1,25 @@
+{
+  "apiVersion": "v1",
+  "kind": "Service",
+  "metadata": {
+    "name": "hupo-chat-preflight",
+    "namespace": "hupo-chat-preflight",
+    "annotations": {
+      "argocd.argoproj.io/sync-wave": "0"
+    }
+  },
+  "spec": {
+    "type": "ClusterIP",
+    "selector": {
+      "app.kubernetes.io/name": "hupo-chat-preflight"
+    },
+    "ports": [
+      {
+        "name": "http",
+        "port": 8080,
+        "targetPort": 8080,
+        "protocol": "TCP"
+      }
+    ]
+  }
+}

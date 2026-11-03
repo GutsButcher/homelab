@@ -1,0 +1,71 @@
+{
+  "schemaVersion": 1,
+  "revision": "e167e12f3f22570bc01823273972886116ed00643fea63b945cb7e420e391330",
+  "targetNode": "node01",
+  "source": "homelab/apps/hupo-chat/base (JSON manifests)",
+  "workloads": [
+    {
+      "name": "hupo-chat-postgres",
+      "kind": "StatefulSet",
+      "replicas": 1,
+      "cpuRequestsNanocores": "250000000",
+      "memoryRequestsBytes": "268435456",
+      "memoryLimitsBytes": "1073741824",
+      "storageBytes": "21474836480",
+      "emptyDirBytes": "150994944"
+    },
+    {
+      "name": "hupo-chat-prepare",
+      "kind": "Job",
+      "replicas": 1,
+      "cpuRequestsNanocores": "250000000",
+      "memoryRequestsBytes": "805306368",
+      "memoryLimitsBytes": "2147483648",
+      "storageBytes": "0",
+      "emptyDirBytes": "671088640"
+    },
+    {
+      "name": "hupo-chat-redis",
+      "kind": "StatefulSet",
+      "replicas": 1,
+      "cpuRequestsNanocores": "100000000",
+      "memoryRequestsBytes": "67108864",
+      "memoryLimitsBytes": "536870912",
+      "storageBytes": "2147483648",
+      "emptyDirBytes": "134217728"
+    },
+    {
+      "name": "hupo-chat-web",
+      "kind": "Deployment",
+      "replicas": 1,
+      "cpuRequestsNanocores": "250000000",
+      "memoryRequestsBytes": "805306368",
+      "memoryLimitsBytes": "2147483648",
+      "storageBytes": "0",
+      "emptyDirBytes": "671088640"
+    },
+    {
+      "name": "hupo-chat-worker",
+      "kind": "Deployment",
+      "replicas": 1,
+      "cpuRequestsNanocores": "250000000",
+      "memoryRequestsBytes": "805306368",
+      "memoryLimitsBytes": "2147483648",
+      "storageBytes": "0",
+      "emptyDirBytes": "671088640"
+    }
+  ],
+  "totals": {
+    "cpuRequestsNanocores": "1100000000",
+    "memoryRequestsBytes": "2751463424",
+    "memoryLimitsBytes": "8053063680",
+    "pvcBytes": "45097156608",
+    "emptyDirBytes": "2298478592"
+  },
+  "reserves": {
+    "cpuNanocores": "250000000",
+    "memoryBytes": "1073741824",
+    "diskBytes": "10737418240",
+    "freeInodes": "1024"
+  }
+}

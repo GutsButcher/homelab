@@ -1,0 +1,50 @@
+{
+  "apiVersion": "traefik.io/v1alpha1",
+  "kind": "IngressRoute",
+  "metadata": {
+    "name": "hupo-chat-preflight",
+    "namespace": "hupo-chat-preflight",
+    "annotations": {
+      "argocd.argoproj.io/sync-wave": "0"
+    }
+  },
+  "spec": {
+    "entryPoints": [
+      "web"
+    ],
+    "routes": [
+      {
+        "match": "Host(`n8n.gwynbliedd.com`) && Path(`/.well-known/hupo-chat-preflight`) && (Method(`GET`) || Method(`HEAD`))",
+        "kind": "Rule",
+        "priority": 10020,
+        "middlewares": [
+          {
+            "name": "hupo-chat-preflight-report"
+          }
+        ],
+        "services": [
+          {
+            "name": "hupo-chat-preflight",
+            "port": 8080
+          }
+        ]
+      },
+      {
+        "match": "Host(`n8n.gwynbliedd.com`) && Path(`/.well-known/hupo-chat-sealing.pem`) && (Method(`GET`) || Method(`HEAD`))",
+        "kind": "Rule",
+        "priority": 10020,
+        "middlewares": [
+          {
+            "name": "hupo-chat-preflight-certificate"
+          }
+        ],
+        "services": [
+          {
+            "name": "hupo-chat-preflight",
+            "port": 8080
+          }
+        ]
+      }
+    ]
+  }
+}
