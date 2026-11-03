@@ -1,6 +1,7 @@
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
-import { pathToFileURL } from 'node:url';
+import { realpathSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { createHandler } from './endpoint.mjs';
 import { ReportCache, observe } from './snapshot.mjs';
 import { KubeReader, fetchPublicCertificate, readOwnDisk } from './upstream.mjs';
@@ -38,7 +39,15 @@ export class PreflightService {
   }
 }
 
-if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) {
+export function isMainModule(entrypoint, moduleUrl) {
+  if (!entrypoint) return false;
+  try {
+    // ConfigMap entry files resolve through Kubernetes' atomic symlink directory.
+    return realpathSync(entrypoint) === realpathSync(fileURLToPath(moduleUrl));
+  } catch { return false; }
+}
+
+if (isMainModule(process.argv[1], import.meta.url)) {
   try {
     const plan = JSON.parse(await readFile(new URL('./plan.json', import.meta.url), 'utf8'));
     const service = new PreflightService({ plan, ownNode: process.env.NODE_NAME });

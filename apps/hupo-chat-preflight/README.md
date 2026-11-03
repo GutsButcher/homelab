@@ -1,8 +1,9 @@
-# Temporary Chatwoot preflight — source only
+# Temporary Chatwoot preflight
 
-No Application is registered here. Nothing is deployed by adding this directory.
-Do not publish/activate it before independent review. Existing apps, parked apps,
-ERP and CNPG are not referenced, mounted, restarted or modified.
+The Application is registered separately under `argocd/applications/apps/` and
+pins the native-tested source revision. Source publication and registration do not
+prove live health or capacity. Existing apps, parked apps, ERP and CNPG are not
+referenced, mounted, restarted or modified.
 
 ## Scope and endpoints
 
@@ -145,22 +146,28 @@ node tools/build-plan.mjs
 
 Preferred isolated test runner, with an **explicitly approved disposable Docker
 endpoint** (not a production/ambient Docker context). Bind source read-only;
-no port publication, network or server startup. On Windows, use a native `C:/...`
+no port publication or external network. On Windows, use a native `C:/...`
 source path, not `/c/...`:
 
 ```sh
 : "${PREFLIGHT_TEST_DOCKER_HOST:?set the approved disposable endpoint}"
 docker --host "$PREFLIGHT_TEST_DOCKER_HOST" run --rm --network none --read-only \
   --user 1000:1000 --cap-drop ALL --security-opt no-new-privileges \
-  --memory 128m --cpus 1 \
-  --mount "type=bind,src=C:/Users/Kaido/work/homelab/apps/hupo-chat-preflight,dst=/work,readonly" \
-  --workdir /work \
+  --memory 256m --cpus 1 --tmpfs=/tmp:rw,noexec,nosuid,size=16m,mode=1777 \
+  --env HUPO_CONTAINER_STARTUP_TESTS=1 \
+  --mount "type=bind,src=C:/Users/Kaido/work/homelab/apps/hupo-chat-preflight,dst=/apps/hupo-chat-preflight,readonly" \
+  --mount "type=bind,src=C:/Users/Kaido/work/homelab/apps/hupo-chat,dst=/apps/hupo-chat,readonly" \
+  --workdir /apps/hupo-chat-preflight \
   node:24.22.2-bookworm-slim@sha256:c86ecead9e55a5210ac1727de38a4ca840bf03dcaf34dc9749addbf383b1920c \
   node --test --test-concurrency=1
 ```
 
-Tests use stdlib fixtures and injected transports/server objects: no external
-network, live credentials, private keys, disk writes or listening sockets. Public
+Most tests use stdlib fixtures and injected transports/server objects. Entry-path
+tests create and remove isolated temporary fixtures. The actual ConfigMap-linked
+entrypoint/loopback HTTP smoke runs only with the explicit container flag above;
+it is skipped on the host. Its child receives no cluster credentials, has no
+external network, and must not report successful capacity. No live credentials
+or private keys are used. Public
 CA roots bundled with Node are certificate-validation fixtures only, never a
 substitute for the real controller certificate. Source/mock tests and local
 Kustomize rendering are **not** proof of live capacity, API connectivity, policy
