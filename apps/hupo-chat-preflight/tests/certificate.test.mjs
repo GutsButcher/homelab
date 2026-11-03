@@ -33,7 +33,24 @@ test('base64 must round-trip exactly, including unused padding bits', () => {
 test('only a single valid public RSA X509 is served; private or appended content is rejected', () => {
   assert.equal(typeof certificate.validateCertificate, 'function');
   const pem = rsa.toString();
-  assert.equal(certificate.validateCertificate(pem, midpoint), pem.trim() + '\n');
+  let normalized;
+  try {
+    normalized = certificate.validateCertificate(pem, midpoint);
+  } catch {
+    const payload = pem.replace(/-----BEGIN CERTIFICATE-----|-----END CERTIFICATE-----|\s/g, '');
+    const decoded = Buffer.from(payload, 'base64');
+    assert.fail('[CERT_DIAG] ' + JSON.stringify({
+      node: process.version, openssl: process.versions.openssl,
+      keyType: rsa.publicKey.asymmetricKeyType,
+      bits: rsa.publicKey.asymmetricKeyDetails?.modulusLength,
+      exponent: String(rsa.publicKey.asymmetricKeyDetails?.publicExponent),
+      exactBase64: decoded.toString('base64') === payload,
+      exactDer: decoded.equals(rsa.raw), validFrom: rsa.validFrom, validTo: rsa.validTo,
+      midpoint, finiteMidpoint: Number.isFinite(midpoint),
+      dateBounds: Date.parse(rsa.validFrom) <= midpoint && midpoint < Date.parse(rsa.validTo)
+    }));
+  }
+  assert.equal(normalized, pem.trim() + '\n');
   assert.equal(certificate.validateCertificate(pem.replace(/\n/g, '\r\n') + ' \t\r\n', midpoint), pem.trim() + '\n');
   for (const invalid of ['garbage', '-----BEGIN PRIVATE KEY-----\nCANARY\n-----END PRIVATE KEY-----',
     pem + '\n-----BEGIN RSA PRIVATE KEY-----\nCANARY\n-----END RSA PRIVATE KEY-----', pem + pem,
