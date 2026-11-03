@@ -1,0 +1,43 @@
+{
+  "apiVersion": "kustomize.config.k8s.io/v1beta1",
+  "kind": "Kustomization",
+  "namespace": "hupo-chat",
+  "resources": [
+    "namespace.yaml",
+    "service-account.yaml",
+    "config.yaml",
+    "uploads.yaml",
+    "postgres-service.yaml",
+    "postgres.yaml",
+    "redis-service.yaml",
+    "redis.yaml",
+    "prepare.yaml",
+    "web-service.yaml",
+    "web.yaml",
+    "worker.yaml",
+    "network-default-deny.yaml",
+    "network-dns.yaml",
+    "network-app.yaml",
+    "network-data.yaml",
+    "network-traefik.yaml"
+  ],
+  "configMapGenerator": [
+    {
+      "name": "hupo-chat-runtime",
+      "files": [
+        "runtime/entrypoint.rb",
+        "runtime/healthcheck.rb",
+        "runtime/bootstrap_config.rb",
+        "runtime/bootstrap.rb",
+        "runtime/check_fcm.rb",
+        "runtime/lock_onboarding.rb"
+      ]
+    }
+  ],
+  "generatorOptions": {
+    "disableNameSuffixHash": true,
+    "annotations": {
+      "argocd.argoproj.io/sync-wave": "-30"
+    }
+  }
+}

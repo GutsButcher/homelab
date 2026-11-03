@@ -1,0 +1,18 @@
+{
+  "apiVersion": "kustomize.config.k8s.io/v1beta1",
+  "kind": "Kustomization",
+  "namespace": "hupo-chat",
+  "resources": [
+    "../base",
+    "ingressroute.yaml"
+  ],
+  "patches": [
+    {
+      "target": {
+        "kind": "ConfigMap",
+        "name": "hupo-chat-config"
+      },
+      "patch": "[{\"op\": \"replace\", \"path\": \"/data/FRONTEND_URL\", \"value\": \"https://chat.gwynbliedd.com\"}]"
+    }
+  ]
+}

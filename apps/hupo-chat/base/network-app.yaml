@@ -1,0 +1,99 @@
+{
+  "apiVersion": "networking.k8s.io/v1",
+  "kind": "NetworkPolicy",
+  "metadata": {
+    "name": "hupo-chat-app",
+    "annotations": {
+      "argocd.argoproj.io/sync-wave": "-30"
+    }
+  },
+  "spec": {
+    "podSelector": {
+      "matchExpressions": [
+        {
+          "key": "app.kubernetes.io/component",
+          "operator": "In",
+          "values": [
+            "web",
+            "worker",
+            "migration",
+            "bootstrap"
+          ]
+        }
+      ]
+    },
+    "policyTypes": [
+      "Egress"
+    ],
+    "egress": [
+      {
+        "to": [
+          {
+            "podSelector": {
+              "matchLabels": {
+                "app.kubernetes.io/name": "hupo-chat",
+                "app.kubernetes.io/part-of": "hupo-chat",
+                "app.kubernetes.io/component": "postgres"
+              }
+            }
+          }
+        ],
+        "ports": [
+          {
+            "port": 5432,
+            "protocol": "TCP"
+          }
+        ]
+      },
+      {
+        "to": [
+          {
+            "podSelector": {
+              "matchLabels": {
+                "app.kubernetes.io/name": "hupo-chat",
+                "app.kubernetes.io/part-of": "hupo-chat",
+                "app.kubernetes.io/component": "redis"
+              }
+            }
+          }
+        ],
+        "ports": [
+          {
+            "port": 6379,
+            "protocol": "TCP"
+          }
+        ]
+      },
+      {
+        "to": [
+          {
+            "ipBlock": {
+              "cidr": "0.0.0.0/0",
+              "except": [
+                "10.0.0.0/8",
+                "172.16.0.0/12",
+                "192.168.0.0/16",
+                "169.254.0.0/16",
+                "127.0.0.0/8"
+              ]
+            }
+          }
+        ],
+        "ports": [
+          {
+            "port": 443,
+            "protocol": "TCP"
+          },
+          {
+            "port": 587,
+            "protocol": "TCP"
+          },
+          {
+            "port": 465,
+            "protocol": "TCP"
+          }
+        ]
+      }
+    ]
+  }
+}

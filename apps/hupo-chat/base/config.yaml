@@ -1,0 +1,37 @@
+{
+  "apiVersion": "v1",
+  "kind": "ConfigMap",
+  "metadata": {
+    "name": "hupo-chat-config",
+    "annotations": {
+      "argocd.argoproj.io/sync-wave": "-30"
+    }
+  },
+  "data": {
+    "RAILS_ENV": "production",
+    "NODE_ENV": "production",
+    "INSTALLATION_ENV": "docker",
+    "POSTGRES_HOST": "hupo-chat-postgres",
+    "POSTGRES_PORT": "5432",
+    "POSTGRES_DATABASE": "hupo_chat",
+    "POSTGRES_USERNAME": "hupo_chat",
+    "REDIS_URL": "redis://hupo-chat-redis:6379/0",
+    "DEFAULT_LOCALE": "ar",
+    "ENABLE_ACCOUNT_SIGNUP": "false",
+    "ACTIVE_STORAGE_SERVICE": "local",
+    "RAILS_SERVE_STATIC_FILES": "true",
+    "RAILS_LOG_TO_STDOUT": "true",
+    "FORCE_SSL": "false",
+    "RAILS_MAX_THREADS": "5",
+    "SIDEKIQ_CONCURRENCY": "5",
+    "WEB_CONCURRENCY": "0",
+    "ANDROID_BUNDLE_ID": "com.chatwoot.app",
+    "SIDEKIQ_ALIVE_HOST": "0.0.0.0",
+    "SIDEKIQ_ALIVE_PORT": "7433",
+    "HOME": "/tmp",
+    "FRONTEND_URL": "http://127.0.0.1:3000",
+    "ENABLE_PUSH_RELAY_SERVER": "true",
+    "ANDROID_SHA256_CERT_FINGERPRINT": "",
+    "LOG_LEVEL": "info"
+  }
+}

@@ -1,0 +1,46 @@
+{
+  "apiVersion": "networking.k8s.io/v1",
+  "kind": "NetworkPolicy",
+  "metadata": {
+    "name": "hupo-chat-traefik",
+    "annotations": {
+      "argocd.argoproj.io/sync-wave": "-30"
+    }
+  },
+  "spec": {
+    "podSelector": {
+      "matchLabels": {
+        "app.kubernetes.io/name": "hupo-chat",
+        "app.kubernetes.io/part-of": "hupo-chat",
+        "app.kubernetes.io/component": "web"
+      }
+    },
+    "policyTypes": [
+      "Ingress"
+    ],
+    "ingress": [
+      {
+        "from": [
+          {
+            "namespaceSelector": {
+              "matchLabels": {
+                "kubernetes.io/metadata.name": "kube-system"
+              }
+            },
+            "podSelector": {
+              "matchLabels": {
+                "app.kubernetes.io/name": "traefik"
+              }
+            }
+          }
+        ],
+        "ports": [
+          {
+            "port": 3000,
+            "protocol": "TCP"
+          }
+        ]
+      }
+    ]
+  }
+}

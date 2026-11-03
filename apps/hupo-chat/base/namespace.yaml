@@ -1,0 +1,11 @@
+{
+  "apiVersion": "v1",
+  "kind": "Namespace",
+  "metadata": {
+    "name": "hupo-chat",
+    "annotations": {
+      "argocd.argoproj.io/sync-wave": "-40",
+      "argocd.argoproj.io/sync-options": "Delete=false"
+    }
+  }
+}

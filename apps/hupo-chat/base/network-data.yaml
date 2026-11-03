@@ -1,0 +1,59 @@
+{
+  "apiVersion": "networking.k8s.io/v1",
+  "kind": "NetworkPolicy",
+  "metadata": {
+    "name": "hupo-chat-data",
+    "annotations": {
+      "argocd.argoproj.io/sync-wave": "-30"
+    }
+  },
+  "spec": {
+    "podSelector": {
+      "matchExpressions": [
+        {
+          "key": "app.kubernetes.io/component",
+          "operator": "In",
+          "values": [
+            "postgres",
+            "redis"
+          ]
+        }
+      ]
+    },
+    "policyTypes": [
+      "Ingress"
+    ],
+    "ingress": [
+      {
+        "from": [
+          {
+            "podSelector": {
+              "matchExpressions": [
+                {
+                  "key": "app.kubernetes.io/component",
+                  "operator": "In",
+                  "values": [
+                    "web",
+                    "worker",
+                    "migration",
+                    "bootstrap"
+                  ]
+                }
+              ]
+            }
+          }
+        ],
+        "ports": [
+          {
+            "port": 5432,
+            "protocol": "TCP"
+          },
+          {
+            "port": 6379,
+            "protocol": "TCP"
+          }
+        ]
+      }
+    ]
+  }
+}
