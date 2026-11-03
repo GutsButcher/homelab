@@ -5,7 +5,10 @@ import { X509Certificate } from 'node:crypto';
 import { optionalImport } from './helpers.mjs';
 const certificate = await optionalImport('../base/runtime/certificate.mjs');
 const rsa = rootCertificates.map(pem => new X509Certificate(pem)).find(cert =>
-  cert.publicKey.asymmetricKeyType === 'rsa' && cert.publicKey.asymmetricKeyDetails.modulusLength >= 2048);
+  cert.publicKey.asymmetricKeyType === 'rsa' &&
+  cert.publicKey.asymmetricKeyDetails.modulusLength >= 2048 &&
+  cert.publicKey.asymmetricKeyDetails.modulusLength <= 8192 &&
+  cert.publicKey.asymmetricKeyDetails.publicExponent >= 65537n && cert.raw.length % 3 !== 0);
 const midpoint = (Date.parse(rsa.validFrom) + Date.parse(rsa.validTo)) / 2;
 
 test('a single PEM block rejects hidden DER, including OpenSSL auxiliary sequences', () => {
@@ -33,24 +36,8 @@ test('base64 must round-trip exactly, including unused padding bits', () => {
 test('only a single valid public RSA X509 is served; private or appended content is rejected', () => {
   assert.equal(typeof certificate.validateCertificate, 'function');
   const pem = rsa.toString();
-  let normalized;
-  try {
-    normalized = certificate.validateCertificate(pem, midpoint);
-  } catch {
-    const payload = pem.replace(/-----BEGIN CERTIFICATE-----|-----END CERTIFICATE-----|\s/g, '');
-    const decoded = Buffer.from(payload, 'base64');
-    assert.fail('[CERT_DIAG] ' + JSON.stringify({
-      node: process.version, openssl: process.versions.openssl,
-      keyType: rsa.publicKey.asymmetricKeyType,
-      bits: rsa.publicKey.asymmetricKeyDetails?.modulusLength,
-      exponent: String(rsa.publicKey.asymmetricKeyDetails?.publicExponent),
-      exactBase64: decoded.toString('base64') === payload,
-      exactDer: decoded.equals(rsa.raw), validFrom: rsa.validFrom, validTo: rsa.validTo,
-      midpoint, finiteMidpoint: Number.isFinite(midpoint),
-      dateBounds: Date.parse(rsa.validFrom) <= midpoint && midpoint < Date.parse(rsa.validTo)
-    }));
-  }
-  assert.equal(normalized, pem.trim() + '\n');
+  assert.ok(rsa.publicKey.asymmetricKeyDetails.publicExponent >= 65537n);
+  assert.equal(certificate.validateCertificate(pem, midpoint), pem.trim() + '\n');
   assert.equal(certificate.validateCertificate(pem.replace(/\n/g, '\r\n') + ' \t\r\n', midpoint), pem.trim() + '\n');
   for (const invalid of ['garbage', '-----BEGIN PRIVATE KEY-----\nCANARY\n-----END PRIVATE KEY-----',
     pem + '\n-----BEGIN RSA PRIVATE KEY-----\nCANARY\n-----END RSA PRIVATE KEY-----', pem + pem,
@@ -64,6 +51,17 @@ test('only a single valid public RSA X509 is served; private or appended content
   assert.throws(() => certificate.validateCertificate(pem, Date.parse(rsa.validFrom) - 1), /CERT_INVALID/);
   const ec = rootCertificates.find(pem => new X509Certificate(pem).publicKey.asymmetricKeyType === 'ec');
   assert.throws(() => certificate.validateCertificate(ec, midpoint), /CERT_INVALID/);
+});
+
+test('RSA roots below the required public-exponent policy remain rejected', () => {
+  const weak = rootCertificates.map(pem => new X509Certificate(pem)).find(cert =>
+    cert.publicKey.asymmetricKeyType === 'rsa' &&
+    cert.publicKey.asymmetricKeyDetails.modulusLength >= 2048 &&
+    cert.publicKey.asymmetricKeyDetails.modulusLength <= 8192 &&
+    cert.publicKey.asymmetricKeyDetails.publicExponent < 65537n);
+  assert.ok(weak, 'offline root corpus must include the negative exponent fixture');
+  const validTime = (Date.parse(weak.validFrom) + Date.parse(weak.validTo)) / 2;
+  assert.throws(() => certificate.validateCertificate(weak.toString(), validTime), /CERT_INVALID/);
 });
 
 function certificatePem(der) {

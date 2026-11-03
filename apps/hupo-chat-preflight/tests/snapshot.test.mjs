@@ -7,6 +7,8 @@ const snapshot = await optionalImport('../base/runtime/snapshot.mjs');
 const pem = rootCertificates.find(text => {
   const cert = new X509Certificate(text);
   return cert.publicKey.asymmetricKeyType === 'rsa' && cert.publicKey.asymmetricKeyDetails.modulusLength >= 2048 &&
+    cert.publicKey.asymmetricKeyDetails.modulusLength <= 8192 &&
+    cert.publicKey.asymmetricKeyDetails.publicExponent >= 65537n &&
     Date.parse(cert.validFrom) < now && Date.parse(cert.validTo) > now;
 });
 
