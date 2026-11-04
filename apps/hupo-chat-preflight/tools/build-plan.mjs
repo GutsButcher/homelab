@@ -6,8 +6,9 @@ import { podResources, quantity } from '../base/runtime/resources.mjs';
 
 const components = ['web', 'worker', 'postgres', 'redis', 'prepare', 'namespace-secrets', 'owner-bootstrap'];
 const reviewedKinds = { web: 'Deployment', worker: 'Deployment', postgres: 'StatefulSet', redis: 'StatefulSet',
-  prepare: 'Job', 'namespace-secrets': 'Job', 'owner-bootstrap': 'Job', 'cluster-verification': 'Job' };
+  prepare: 'Job', 'namespace-secrets': 'Job', 'owner-bootstrap': 'Job', 'cluster-verification': 'Job', public: 'Deployment' };
 const verificationName = 'hupo-chat-cluster-verification';
+const tunnelName = 'hupo-chat-public';
 const workloadKinds = ['Deployment', 'StatefulSet', 'Job', 'DaemonSet', 'CronJob', 'Pod'];
 const resourceApis = { Deployment: 'apps/v1', StatefulSet: 'apps/v1', Job: 'batch/v1',
   Namespace: 'v1', ServiceAccount: 'v1', Service: 'v1', ConfigMap: 'v1', Secret: 'v1', PersistentVolumeClaim: 'v1',
@@ -17,6 +18,7 @@ const resourceApis = { Deployment: 'apps/v1', StatefulSet: 'apps/v1', Job: 'batc
 const clusterKinds = ['Namespace', 'ClusterRole', 'ClusterRoleBinding'];
 const kustomizationKeys = ['apiVersion', 'kind', 'namespace', 'resources', 'configMapGenerator', 'generatorOptions'];
 const defaultSource = fileURLToPath(new URL('../../hupo-chat/base', import.meta.url));
+const retryPolicy = { schemaVersion: 1, prepareBackoffLimit: 2, prepareConcurrentReservation: 3, otherWorkloadReservation: 1 };
 
 export function parseArguments(args) {
   let source;
@@ -41,6 +43,7 @@ export function buildPlan(documents, revision) {
   const names = workloads.map(doc => doc.metadata?.name).sort();
   const expected = components.map(c => `hupo-chat-${c}`);
   if (names.includes(verificationName)) expected.push(verificationName);
+  if (names.includes(tunnelName)) expected.push(tunnelName);
   if (JSON.stringify(names) !== JSON.stringify(expected.sort())) throw new Error('PLAN_INVALID');
   const rows = workloads.map(workloadBudget).sort((a, b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0);
   const sum = key => rows.reduce((total, row) => total + BigInt(row[key]), 0n);
@@ -63,11 +66,16 @@ export function explainPlan(plan) {
   const verification = plan.workloads.some(row => row.name === verificationName) ?
     'The additional verification Job is included as a concurrent row, including its CPU, memory, storage and pod slot; it does not consume the safety reserves. ' :
     '**Verification job is not included.** Materialize the public verification Job, regenerate this plan and refresh runtime evidence before using it for deployment. The 1Gi reserve does not prove verification CPU or pod-slot headroom. ';
+  const tunnel = plan.workloads.some(row => row.name === tunnelName) ?
+    'The actual public tunnel Deployment is included as a concurrent row, not hidden in reserves. ' :
+    '**Tunnel Deployment is not included.** This budget cannot accept tunnel activation. ';
+  const nine = plan.workloads.length === 9 ? 'All nine reviewed workloads are budgeted concurrently. The selected declared-retry reservation is eleven planned pods for nine workload rows. Older seven-workload evidence does not accept this nine-workload revision; older nine-pod evidence does not accept the new retry policy either. ' : '';
   const rows = plan.workloads.map(w => `| ${w.name} | ${w.replicas} | ${BigInt(w.cpuRequestsNanocores) / 1000000n}m | ${mi(w.memoryRequestsBytes)} | ${mi(w.memoryLimitsBytes)} |`).join('\n');
   return `# Generated source budget\n\n` +
     `Source: \`${plan.source}\`; relevant source SHA-256: \`${plan.revision}\`.\n\n` +
-    `**Source budget only.** No live capacity result or deployment acceptance is established by generation. An older five-workload snapshot does not accept this revision; promote the matching preflight source and obtain a fresh runtime snapshot.\n\n` +
-    `| Workload | Concurrent replicas | CPU requests | Memory requests | Memory limits |\n` +
+    `**Source budget only.** No live capacity result or deployment acceptance is established by generation. ${nine}` +
+    `Before auxiliary activation, the exact new preflight source must pass native Node 24 tests, then a fresh matching live snapshot must pass all eight checks. No older snapshot accepts changed source bytes. Main application health remains unobserved by this source check.\n\n` +
+    `| Workload | Planned pod reservation | CPU requests | Memory requests | Memory limits |\n` +
     `| --- | ---: | ---: | ---: | ---: |\n${rows}\n\n` +
     `Totals: **${BigInt(t.cpuRequestsNanocores) / 1000000n}m CPU requests**, **${mi(t.memoryRequestsBytes)} memory requests**, **${mi(t.memoryLimitsBytes)} memory limits**.\n\n` +
     `Declared app PVCs: ${t.pvcBytes} bytes; declared emptyDir bounds: ${t.emptyDirBytes} bytes; explicit disk reserve: ${r.diskBytes} bytes. ` +
@@ -79,16 +87,29 @@ export function explainPlan(plan) {
     `The runtime pod-slot check counts every replica in the workload rows (${plan.workloads.reduce((sum, row) => sum + row.replicas, 0)} planned pods).\n` +
     `- ${verification}Canonical generation and \`--check\` automatically include \`homelab/apps/hupo-chat-verification/base/job.yaml\` when present. ` +
     `An explicit \`--additional-job PATH\` supports a reviewed source override, not production acceptance.\n` +
+    `- ${tunnel}Canonical generation and \`--check\` also automatically include exactly \`homelab/apps/hupo-chat-public/base/deployment.yaml\` when present. ` +
+    `No tunnel directory scan, basename guess, phase credit or generic cluster-YAML import is used. Copies of the canonical base without auxiliary inputs remain seven-row fixtures with nine planned pods, not auxiliary deployment proof.\n` +
+    `- The selected declared-retry reservation is three complete prepare copies (backoffLimit + 1) and one copy of every other workload. All source parallelism/replica guards still require one configured replica. ` +
+    `The reviewed prepare source must retain explicit integer backoffLimit=2; it has activeDeadlineSeconds=900 and terminationGracePeriodSeconds=40. CPU, memory, per-copy claims and emptyDirs are scaled for both declared retries on top of every normal workload row. ` +
+    `This is not an absolute controller replacement hard cap: retries and terminating/replacement pods may overlap beyond this bounded declared-retry model. Arbitrary external deletions/controller replacement behavior are not bounded here. ` +
+    `Any healthy-main/freeze requirement and broader replacement risk remain activation review gates, not phase credits.\n` +
+    `- All existing nonterminal pods and actual usage are counted on top of the prospective plan, including existing copies of these workloads; no phase or existing-workload subtraction is allowed. ` +
+    `The 1Gi memory and 10Gi disk reserves remain additional requirements, never auxiliary or retry credits.\n` +
     `- Both existing CPU requests and actual CPU usage, plus planned CPU requests and reserve, must fit allocatable CPU. CPU limits may still contend later.\n` +
     `- Existing memory requests plus planned requests and reserve must fit; max(existing requests, actual memory usage) plus all planned memory limits and reserve must also fit.\n` +
     `- Every regular and init container, including restartable init sidecars, must declare an explicit positive memory limit. A zero limit is unbounded, not a zero-byte cap. ` +
-    `This fixed seven/eight-workload source policy rejects zero container limits even with a positive pod-level memory cap; CPU and request semantics are unchanged.\n` +
+    `This fixed seven/eight/nine-workload source policy rejects zero container limits even with a positive pod-level memory cap; CPU and request semantics are unchanged.\n` +
     `- Every declared standalone PVC, per-replica volumeClaimTemplate and generic ephemeral claim template is included, plus positive emptyDir size limits and a separate image/log/growth reserve. ` +
     `Local-path sizes are not filesystem quotas or physical reservations. statfs reads only the dedicated read-only /probe-storage mount; it writes no test files.\n` +
+    `- The verification Job declares 16Ki results plus 4Ki owner-envelope memory-backed emptyDirs (20Ki total). These bytes remain within measured memory/limits and are also conservatively charged in the disk bound; they are not excluded by their Memory medium. ` +
+    `A retained earlier collector's 16Ki result bound is not a cleanup credit: actual residual memory/storage usage must still be measured until cleanup, regardless of terminal-pod filtering or TTL.\n` +
     `- Exclude only terminal pods and other nodes. Include scheduled Pending/Unknown pods, regular init peaks, ordered restartable-init sidecars, pod overhead, pod-level requests and enacted/in-flight resize allocations.\n` +
     `- Follow local JSON Kustomization resources recursively, not a directory-wide filename scan. Remote references, parent traversal, symlink escapes, cycles, duplicate bindings, unsupported resource kinds and Kustomize transformations fail closed. ` +
-    `Reads are bounded to 256 files, 1MiB per file and 8MiB total. Every reviewed workload must retain its kind, one concurrent replica and node01 selector; deployments must use Recreate.\n` +
-    `- The revision binds deterministic relative paths and raw Kustomization, workload, PVC and referenced generator-file bytes. The additional verification Job uses a separate hash path. ` +
+    `Reads are bounded to 256 files, 1MiB per file and 8MiB total. Every reviewed workload must retain its kind, one configured replica and node01 selector; deployments must use Recreate. ` +
+    `The verifier must explicitly retain namespace hupo-chat, integer parallelism=1, completions=1, backoffLimit=0 and restartPolicy=Never, including explicit overrides. ` +
+    `The tunnel must explicitly retain namespace hupo-chat, replicas=1 and no volumes/mounts; auxiliary Jobs cannot introduce PVC/host storage or unbound mounts.\n` +
+    `- The revision binds deterministic relative paths and raw Kustomization, workload, PVC and referenced generator-file bytes, plus explicit versioned retry-policy bytes at @planner/retry-policy.json. Additional verification and tunnel resources use separate @verification/job.yaml and @tunnel/deployment.yaml hash paths. ` +
+    `Canonical and auxiliary files must remain inside the real repository boundary; resource references also remain inside their selected canonical source tree. ` +
     `Configuration, secret values, environment, identities and raw annotations are never copied into this report.\n` +
     `- Missing inputs, stale metrics, incomplete pod lists or unknown disk counters fail closed. Snapshot success is not a promise of zero future shared-host impact, a storage quota, a backup or deployment authorization.\n`;
 }
@@ -97,11 +118,17 @@ export async function readSourcePlan(sourceDirectory, additionalJobPath) {
   try {
     const root = await realpath(resolve(sourceDirectory));
     if (!(await stat(root)).isDirectory()) throw new Error('PLAN_INVALID');
+    const repository = resolve(sourceDirectory) === defaultSource ?
+      await realpath(fileURLToPath(new URL('../../../', import.meta.url))) : undefined;
+    if (repository !== undefined) await new SourceTree(repository).contained(root);
     const tree = new SourceTree(root);
     await tree.visit(root);
-    if (additionalJobPath === undefined) additionalJobPath = await defaultVerificationJob(sourceDirectory);
-    if (additionalJobPath !== undefined) await tree.verificationJob(additionalJobPath);
+    if (additionalJobPath === undefined) additionalJobPath = await defaultAdditional(sourceDirectory, '../../hupo-chat-verification/base/job.yaml');
+    if (additionalJobPath !== undefined) await tree.additionalResource(additionalJobPath, 'Job', verificationName, '@verification/job.yaml', repository);
+    const tunnel = await defaultAdditional(sourceDirectory, '../../hupo-chat-public/base/deployment.yaml');
+    if (tunnel !== undefined) await tree.additionalResource(tunnel, 'Deployment', tunnelName, '@tunnel/deployment.yaml', repository);
     const hash = createHash('sha256');
+    tree.sources.set('@planner/retry-policy.json', Buffer.from(JSON.stringify(retryPolicy) + '\n'));
     for (const [path, raw] of [...tree.sources].sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0)) {
       hash.update(path + '\0').update(raw).update('\0');
     }
@@ -121,9 +148,9 @@ export async function generate(sourceDirectory, check = false, additionalJobPath
   return plan;
 }
 
-async function defaultVerificationJob(sourceDirectory) {
+async function defaultAdditional(sourceDirectory, resource) {
   if (resolve(sourceDirectory) !== defaultSource) return undefined;
-  const path = fileURLToPath(new URL('../../hupo-chat-verification/base/job.yaml', import.meta.url));
+  const path = fileURLToPath(new URL(resource, import.meta.url));
   try { await lstat(path); return path; }
   catch (error) { if (error.code !== 'ENOENT') throw error; }
 }
@@ -131,13 +158,13 @@ async function defaultVerificationJob(sourceDirectory) {
 class SourceTree {
   constructor(root) { this.root = root; this.documents = []; this.sources = new Map(); this.seen = new Set(); this.bytes = 0; }
 
-  async verificationJob(path) {
-    const boundary = new SourceTree(resolve(dirname(path)));
+  async additionalResource(path, kind, name, hashPath, repository = resolve(dirname(path))) {
+    const boundary = new SourceTree(repository);
     const raw = await this.readRaw(await boundary.contained(resolve(path)));
     const doc = JSON.parse(raw.toString('utf8'));
-    if (doc.kind !== 'Job' || doc.metadata?.name !== verificationName) throw new Error('PLAN_INVALID');
+    if (doc.kind !== kind || doc.metadata?.name !== name) throw new Error('PLAN_INVALID');
     this.documents.push(doc);
-    this.sources.set('@verification/job.yaml', raw);
+    this.sources.set(hashPath, raw);
   }
 
   async visit(path, namespace = '') {
@@ -237,10 +264,21 @@ function validateDocuments(documents) {
 
 function workloadBudget(doc) {
   const configured = doc.spec?.[doc.kind === 'Job' ? 'parallelism' : 'replicas'];
-  const replicas = configured === undefined ? 1 : configured;
-  if (replicas !== 1 || doc.kind !== reviewedKinds[doc.metadata.name.replace(/^hupo-chat-/, '')]) throw new Error('PLAN_INVALID');
+  const sourceReplicas = configured === undefined ? 1 : configured;
+  if (sourceReplicas !== 1 || doc.kind !== reviewedKinds[doc.metadata.name.replace(/^hupo-chat-/, '')]) throw new Error('PLAN_INVALID');
+  const prepare = doc.metadata.name === 'hupo-chat-prepare';
+  if (prepare && doc.spec.backoffLimit !== retryPolicy.prepareBackoffLimit) throw new Error('PLAN_INVALID');
+  const replicas = prepare ? retryPolicy.prepareConcurrentReservation : retryPolicy.otherWorkloadReservation;
   if (doc.kind === 'Deployment' && doc.spec.strategy?.type !== 'Recreate') throw new Error('PLAN_INVALID');
   const pod = { spec: doc.spec.template.spec };
+  if (doc.metadata.name === verificationName && (doc.metadata.namespace !== 'hupo-chat' ||
+      doc.spec.parallelism !== 1 || doc.spec.completions !== 1 || doc.spec.backoffLimit !== 0 ||
+      pod.spec.restartPolicy !== 'Never')) throw new Error('PLAN_INVALID');
+  if ([verificationName, tunnelName].includes(doc.metadata.name)) validateAuxiliaryVolumes(doc, pod.spec);
+  if (doc.metadata.name === tunnelName && (doc.metadata.namespace !== 'hupo-chat' || doc.spec.replicas !== 1 ||
+      doc.spec.volumeClaimTemplates !== undefined || (pod.spec.volumes || []).length !== 0 ||
+      [...(pod.spec.containers || []), ...(pod.spec.initContainers || [])].some(container =>
+        (container.volumeMounts || []).length !== 0 || (container.volumeDevices || []).length !== 0))) throw new Error('PLAN_INVALID');
   if (pod.spec.nodeSelector?.['kubernetes.io/hostname'] !== 'node01' ||
       (pod.spec.nodeName !== undefined && pod.spec.nodeName !== 'node01')) throw new Error('PLAN_INVALID');
   const requests = podResources(pod, 'requests', true);
@@ -268,6 +306,25 @@ function positiveStorage(value) {
   const bytes = quantity(value, 'storage');
   if (bytes === 0n) throw new Error('PLAN_INVALID');
   return bytes;
+}
+
+function validateAuxiliaryVolumes(doc, pod) {
+  if (doc.spec.volumeClaimTemplates !== undefined ||
+      (pod.volumes !== undefined && !Array.isArray(pod.volumes))) throw new Error('PLAN_INVALID');
+  const volumes = pod.volumes || [];
+  const names = new Set();
+  for (const volume of volumes) {
+    const types = Object.keys(volume).filter(key => key !== 'name');
+    if (typeof volume.name !== 'string' || names.has(volume.name) || types.length !== 1 ||
+        !['emptyDir', 'configMap', 'secret', 'projected', 'downwardAPI'].includes(types[0]) ||
+        !volume[types[0]] || typeof volume[types[0]] !== 'object' || Array.isArray(volume[types[0]])) throw new Error('PLAN_INVALID');
+    names.add(volume.name);
+  }
+  for (const container of [...(pod.containers || []), ...(pod.initContainers || [])]) {
+    if ((container.volumeMounts !== undefined && !Array.isArray(container.volumeMounts)) ||
+        (container.volumeDevices !== undefined && (!Array.isArray(container.volumeDevices) || container.volumeDevices.length))) throw new Error('PLAN_INVALID');
+    if ((container.volumeMounts || []).some(mount => !names.has(mount.name))) throw new Error('PLAN_INVALID');
+  }
 }
 
 if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) {

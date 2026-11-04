@@ -1,0 +1,121 @@
+{
+  "apiVersion": "batch/v1",
+  "kind": "Job",
+  "metadata": {
+    "name": "hupo-chat-cluster-verification",
+    "namespace": "hupo-chat",
+    "annotations": {
+      "argocd.argoproj.io/sync-wave": "30",
+      "argocd.argoproj.io/hook": "Sync",
+      "argocd.argoproj.io/hook-delete-policy": "BeforeHookCreation"
+    }
+  },
+  "spec": {
+    "completions": 1,
+    "parallelism": 1,
+    "backoffLimit": 0,
+    "activeDeadlineSeconds": 300,
+    "ttlSecondsAfterFinished": 600,
+    "template": {
+      "metadata": {"labels": {"app.kubernetes.io/name": "hupo-chat-cluster-verify"}},
+      "spec": {
+        "serviceAccountName": "hupo-chat-verification-metadata",
+        "automountServiceAccountToken": false,
+        "nodeSelector": {"kubernetes.io/hostname": "node01"},
+        "restartPolicy": "Never",
+        "terminationGracePeriodSeconds": 5,
+        "securityContext": {
+          "runAsNonRoot": true,
+          "runAsUser": 1000,
+          "runAsGroup": 1000,
+          "fsGroup": 1000,
+          "seccompProfile": {"type": "RuntimeDefault"}
+        },
+        "initContainers": [{
+          "name": "collect",
+          "image": "chatwoot/chatwoot:v4.19.1-ce@sha256:04895c7bd0550d9e74b45b7202787b56f7ee4e891ebbde0c429c8c32901b97cf",
+          "imagePullPolicy": "IfNotPresent",
+          "command": ["ruby", "-e", "Process.setrlimit(Process::RLIMIT_NPROC, 64, 64); exec('ruby', File.realpath('/opt/cluster-verify/collector.rb'), '--run-in-cluster')"],
+          "workingDir": "/opt/cluster-verify",
+          "env": [{"name": "HOME", "value": "/nonexistent"}, {"name": "RUBYOPT", "value": ""}, {"name": "RUBYLIB", "value": ""}],
+          "securityContext": {"allowPrivilegeEscalation": false, "readOnlyRootFilesystem": true, "capabilities": {"drop": ["ALL"]}},
+          "resources": {"requests": {"cpu": "25m", "memory": "64Mi"}, "limits": {"cpu": "200m", "memory": "192Mi"}},
+          "volumeMounts": [
+            {"name": "collector-code", "mountPath": "/opt/cluster-verify", "readOnly": true},
+            {"name": "reporter-code", "mountPath": "/opt/gitops-report", "readOnly": true},
+            {"name": "binding", "mountPath": "/run-binding", "readOnly": true},
+            {"name": "owner", "mountPath": "/owner", "readOnly": true},
+            {"name": "api-access", "mountPath": "/var/run/hupo-chat-api", "readOnly": true},
+            {"name": "results", "mountPath": "/results", "readOnly": false}
+          ]
+        }, {
+          "name": "encrypt-owner-access",
+          "image": "chatwoot/chatwoot:v4.19.1-ce@sha256:04895c7bd0550d9e74b45b7202787b56f7ee4e891ebbde0c429c8c32901b97cf",
+          "imagePullPolicy": "IfNotPresent",
+          "command": ["ruby", "-e", "Process.setrlimit(Process::RLIMIT_NPROC, 64, 64); exec('ruby', File.realpath('/opt/hupo-chat-owner-access/encrypt.rb'), '--run-in-cluster')"],
+          "workingDir": "/opt/hupo-chat-owner-access",
+          "env": [{"name": "HOME", "value": "/nonexistent"}, {"name": "RUBYOPT", "value": ""}, {"name": "RUBYLIB", "value": ""}],
+          "securityContext": {"allowPrivilegeEscalation": false, "readOnlyRootFilesystem": true, "capabilities": {"drop": ["ALL"]}},
+          "resources": {"requests": {"cpu": "25m", "memory": "64Mi"}, "limits": {"cpu": "25m", "memory": "64Mi"}},
+          "volumeMounts": [
+            {"name": "results", "mountPath": "/results", "readOnly": true},
+            {"name": "reporter-code", "mountPath": "/opt/gitops-report", "readOnly": true},
+            {"name": "binding", "mountPath": "/run-binding", "readOnly": true},
+            {"name": "owner", "mountPath": "/var/run/hupo-chat-owner", "readOnly": true},
+            {"name": "owner-code", "mountPath": "/opt/hupo-chat-owner-access", "readOnly": true},
+            {"name": "owner-access", "mountPath": "/owner-access", "readOnly": false}
+          ]
+        }],
+        "containers": [{
+          "name": "report",
+          "image": "chatwoot/chatwoot:v4.19.1-ce@sha256:04895c7bd0550d9e74b45b7202787b56f7ee4e891ebbde0c429c8c32901b97cf",
+          "imagePullPolicy": "IfNotPresent",
+          "command": ["ruby", "-e", "Process.setrlimit(Process::RLIMIT_NPROC, 64, 64); begin; system('ruby', File.realpath('/opt/hupo-chat-owner-access/publish.rb'), '--run-in-cluster'); rescue StandardError; puts 'owner_access_publication_failed'; ensure; exec('ruby', File.realpath('/opt/gitops-report/reporter.rb')); end"],
+          "workingDir": "/opt/gitops-report",
+          "env": [{"name": "HOME", "value": "/nonexistent"}, {"name": "RUBYOPT", "value": ""}, {"name": "RUBYLIB", "value": ""}],
+          "securityContext": {"allowPrivilegeEscalation": false, "readOnlyRootFilesystem": true, "capabilities": {"drop": ["ALL"]}},
+          "resources": {"requests": {"cpu": "25m", "memory": "64Mi"}, "limits": {"cpu": "200m", "memory": "192Mi"}},
+          "volumeMounts": [
+            {"name": "reporter-code", "mountPath": "/opt/gitops-report", "readOnly": true},
+            {"name": "report-token", "mountPath": "/report-token", "readOnly": true},
+            {"name": "results", "mountPath": "/results", "readOnly": true},
+            {"name": "owner-code", "mountPath": "/opt/hupo-chat-owner-access", "readOnly": true},
+            {"name": "owner-access", "mountPath": "/owner-access", "readOnly": true}
+          ]
+        }],
+        "volumes": [
+          {"name": "collector-code", "configMap": {"name": "hupo-chat-cluster-verify-code", "defaultMode": 292, "optional": false}},
+          {"name": "reporter-code", "configMap": {
+            "name": "hupo-chat-verification-code", "defaultMode": 292, "optional": false,
+            "items": [{"key": "result.rb", "path": "result.rb"}, {"key": "github_client.rb", "path": "github_client.rb"}, {"key": "reporter.rb", "path": "reporter.rb"}, {"key": "source_sha", "path": "source_sha"}]
+          }},
+          {"name": "binding", "secret": {
+            "secretName": "hupo-chat-verification-token", "defaultMode": 288, "optional": false,
+            "items": [{"key": "source_sha", "path": "source_sha"}, {"key": "nonce", "path": "nonce"}]
+          }},
+          {"name": "owner", "secret": {
+            "secretName": "hupo-chat-owner-bootstrap", "defaultMode": 288, "optional": false,
+            "items": [{"key": "OWNER_EMAIL", "path": "OWNER_EMAIL"}, {"key": "OWNER_PASSWORD", "path": "OWNER_PASSWORD"}]
+          }},
+          {"name": "api-access", "projected": {
+            "defaultMode": 288,
+            "sources": [
+              {"serviceAccountToken": {"path": "token", "expirationSeconds": 600, "audience": "https://kubernetes.default.svc.cluster.local"}},
+              {"configMap": {"name": "kube-root-ca.crt", "optional": false, "items": [{"key": "ca.crt", "path": "ca.crt"}]}}
+            ]
+          }},
+          {"name": "report-token", "secret": {
+            "secretName": "hupo-chat-verification-token", "defaultMode": 288, "optional": false,
+            "items": [{"key": "token", "path": "token"}, {"key": "source_sha", "path": "source_sha"}, {"key": "nonce", "path": "nonce"}]
+          }},
+          {"name": "results", "emptyDir": {"sizeLimit": "16Ki", "medium": "Memory"}},
+          {"name": "owner-code", "configMap": {
+            "name": "hupo-chat-owner-access-code", "defaultMode": 292, "optional": false,
+            "items": [{"key": "wire.rb", "path": "wire.rb"}, {"key": "encrypt.rb", "path": "encrypt.rb"}, {"key": "publish.rb", "path": "publish.rb"}, {"key": "recipient.pem", "path": "recipient.pem"}, {"key": "recipient_sha256", "path": "recipient_sha256"}]
+          }},
+          {"name": "owner-access", "emptyDir": {"medium": "Memory", "sizeLimit": "4Ki"}}
+        ]
+      }
+    }
+  }
+}

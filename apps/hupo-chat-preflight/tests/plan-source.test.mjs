@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { copyFile, cp, mkdir, mkdtemp, readFile, rename, rm, symlink, writeFile } from 'node:fs/promises';
+import { copyFile, cp, mkdir, mkdtemp, readFile, rename, rm, stat, symlink, writeFile } from 'node:fs/promises';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { pathToFileURL } from 'node:url';
@@ -45,6 +45,7 @@ class PlanFixture {
       ['postgres', 'redis'].includes(name) ? 'StatefulSet' : 'Deployment';
     return { apiVersion: kind === 'Job' ? 'batch/v1' : 'apps/v1', kind, metadata: { name: `hupo-chat-${name}` },
       spec: { ...(kind === 'Job' ? { parallelism: 1 } : { replicas: 1 }),
+        ...(name === 'prepare' ? { backoffLimit: 2 } : {}),
         ...(kind === 'Deployment' ? { strategy: { type: 'Recreate' } } : {}),
         template: { spec: { nodeSelector: { 'kubernetes.io/hostname': 'node01' },
           containers: [{ name: 'app', resources: { requests: { cpu: '100m', memory: '64Mi' },
@@ -74,10 +75,10 @@ test('source plan follows the recursive Kustomization graph rather than filename
   const plan = await budget.readSourcePlan(fixture.source);
   assert.equal(plan.schemaVersion, 1);
   assert.equal(plan.workloads.length, 7);
-  assert.equal(plan.totals.cpuRequestsNanocores, '700000000');
-  assert.equal(plan.totals.memoryLimitsBytes, String(7n * 128n * 1024n ** 2n));
+  assert.equal(plan.totals.cpuRequestsNanocores, '900000000');
+  assert.equal(plan.totals.memoryLimitsBytes, String(9n * 128n * 1024n ** 2n));
   assert.equal(plan.totals.pvcBytes, String(5n * 1024n ** 3n));
-  assert.equal(plan.totals.emptyDirBytes, String(7n * 1024n ** 2n));
+  assert.equal(plan.totals.emptyDirBytes, String(9n * 1024n ** 2n));
 });
 
 test('resource references cannot escape the selected tree or use remote paths', async t => {
@@ -197,8 +198,7 @@ test('source collection bounds total bytes across generator files', async t => {
 test('an explicit verification job contributes its real resources and an eighth pod slot', async t => {
   const fixture = await PlanFixture.create(t);
   const original = await budget.readSourcePlan(fixture.source);
-  const verifier = fixture.workload('namespace-secrets');
-  verifier.metadata.name = 'hupo-chat-cluster-verification';
+  const verifier = verificationJob();
   verifier.spec.template.spec.containers[0].resources = {
     requests: { cpu: '25m', memory: '64Mi' }, limits: { cpu: '200m', memory: '192Mi' } };
   verifier.spec.template.spec.volumes = [{ name: 'result', emptyDir: { sizeLimit: '16Ki', medium: 'Memory' } }];
@@ -206,15 +206,15 @@ test('an explicit verification job contributes its real resources and an eighth 
   await writeFile(path, JSON.stringify(verifier));
   const plan = await budget.readSourcePlan(fixture.source, path);
   assert.equal(plan.workloads.length, 8);
-  assert.equal(plan.workloads.reduce((sum, row) => sum + row.replicas, 0), 8);
+  assert.equal(plan.workloads.reduce((sum, row) => sum + row.replicas, 0), 10);
   const runtimeInput = inputs();
-  runtimeInput.node.status.allocatable.pods = '7';
+  runtimeInput.node.status.allocatable.pods = '9';
   assert.equal(evaluate(runtimeInput, plan, 'node01', now).podSlots, false);
-  runtimeInput.node.status.allocatable.pods = '8';
+  runtimeInput.node.status.allocatable.pods = '10';
   assert.equal(evaluate(runtimeInput, plan, 'node01', now).podSlots, true);
-  assert.equal(plan.totals.cpuRequestsNanocores, '725000000');
-  assert.equal(plan.totals.memoryLimitsBytes, String((7n * 128n + 192n) * 1024n ** 2n));
-  assert.equal(plan.totals.emptyDirBytes, String(7n * 1024n ** 2n + 16n * 1024n));
+  assert.equal(plan.totals.cpuRequestsNanocores, '925000000');
+  assert.equal(plan.totals.memoryLimitsBytes, String((9n * 128n + 192n) * 1024n ** 2n));
+  assert.equal(plan.totals.emptyDirBytes, String(9n * 1024n ** 2n + 16n * 1024n));
   assert.notEqual(plan.revision, original.revision);
   for (const invalid of [undefined, 'hupo-chat-another-job']) {
     verifier.metadata.name = invalid;
@@ -227,7 +227,7 @@ test('an explicit verification job contributes its real resources and an eighth 
 // Collector-shaped fixture only: never read private collector source or execute this Job.
 function verificationJob() {
   return { apiVersion: 'batch/v1', kind: 'Job',
-    metadata: { name: 'hupo-chat-cluster-verification', namespace: 'hupo-chat-preflight' },
+    metadata: { name: 'hupo-chat-cluster-verification', namespace: 'hupo-chat' },
     spec: { parallelism: 1, completions: 1, backoffLimit: 0, template: { spec: {
       nodeSelector: { 'kubernetes.io/hostname': 'node01' }, restartPolicy: 'Never',
       serviceAccountName: 'hupo-chat-cluster-verification',
@@ -325,8 +325,7 @@ test('default CLI check automatically includes a materialized public verificatio
   assert.equal((await isolated.readSourcePlan(canonical)).workloads.length, 7);
   const publicJob = join(fixture.root, 'apps/hupo-chat-verification/base/job.yaml');
   await mkdir(dirname(publicJob), { recursive: true });
-  const verifier = fixture.workload('namespace-secrets');
-  verifier.metadata.name = 'hupo-chat-cluster-verification';
+  const verifier = verificationJob();
   await writeFile(publicJob, JSON.stringify(verifier));
   const generated = await isolated.generate(canonical);
   assert.equal(generated.workloads.length, 8);
@@ -370,7 +369,9 @@ test('source revision binds sorted paths and exact raw workflow and PVC bytes', 
     'bootstrap/nested/kustomization.yaml', 'bootstrap/owner.yaml', 'bootstrap/nested/generator.yaml',
     'bootstrap/nested/claim.yaml', ...Array.from({ length: 5 }, (_, index) => `steady/${index}.json`)];
   const expected = createHash('sha256');
-  for (const path of paths.sort()) expected.update(path + '\0').update(await readFile(join(fixture.source, path))).update('\0');
+  paths.push('@planner/retry-policy.json');
+  for (const path of paths.sort()) expected.update(path + '\0')
+    .update(path === '@planner/retry-policy.json' ? retryPolicyBytes : await readFile(join(fixture.source, path))).update('\0');
   assert.equal(plan.revision, expected.digest('hex'));
   const independent = await PlanFixture.create(t);
   assert.deepEqual(await budget.readSourcePlan(independent.source), plan);
@@ -418,4 +419,403 @@ test('canonical source exposes the integrated namespace-generation and owner-boo
     assert.equal(row.replicas, 1);
     assert.ok(BigInt(row.memoryLimitsBytes) > 0n);
   }
+});
+
+async function auxiliaryFixture(t) {
+  const fixture = await PlanFixture.copyCanonical(t);
+  const app = join(fixture.root, 'apps/hupo-chat-preflight');
+  const canonical = join(fixture.root, 'apps/hupo-chat/base');
+  const script = join(app, 'tools/build-plan.mjs');
+  await mkdir(join(app, 'tools'), { recursive: true });
+  await mkdir(join(app, 'base/runtime'), { recursive: true });
+  await mkdir(dirname(canonical), { recursive: true });
+  await rename(fixture.source, canonical);
+  fixture.source = canonical;
+  await copyFile(new URL('../tools/build-plan.mjs', import.meta.url), script);
+  await copyFile(new URL('../base/runtime/resources.mjs', import.meta.url), join(app, 'base/runtime/resources.mjs'));
+  fixture.builder = await import(pathToFileURL(script).href);
+  fixture.script = script;
+  fixture.jobPath = join(fixture.root, 'apps/hupo-chat-verification/base/job.yaml');
+  fixture.tunnelPath = join(fixture.root, 'apps/hupo-chat-public/base/deployment.yaml');
+  fixture.job = JSON.parse(await readFile(new URL('../../hupo-chat-verification/base/job.yaml', import.meta.url), 'utf8'));
+  fixture.tunnel = JSON.parse(await readFile(new URL('../../hupo-chat-public/base/deployment.yaml', import.meta.url), 'utf8'));
+  fixture.read = () => fixture.builder.readSourcePlan(fixture.source);
+  fixture.putAuxiliary = async (path, value) => {
+    await mkdir(dirname(path), { recursive: true });
+    await writeFile(path, JSON.stringify(value, null, 2) + '\n');
+  };
+  return fixture;
+}
+
+test('default canonical planner budgets both actual auxiliary files as nine concurrent workloads', async t => {
+  const fixture = await auxiliaryFixture(t);
+  const seven = await fixture.read();
+  assert.equal(seven.workloads.length, 7);
+  await fixture.putAuxiliary(fixture.jobPath, fixture.job);
+  await fixture.putAuxiliary(fixture.tunnelPath, fixture.tunnel);
+  const nine = await fixture.read();
+  assert.equal(nine.workloads.length, 9);
+  assert.equal(nine.workloads.reduce((sum, row) => sum + row.replicas, 0), 11);
+  assert.equal(nine.totals.cpuRequestsNanocores, String(BigInt(seven.totals.cpuRequestsNanocores) + 50000000n));
+  assert.equal(nine.totals.memoryRequestsBytes, String(BigInt(seven.totals.memoryRequestsBytes) + 128n * 1024n ** 2n));
+  assert.equal(nine.totals.memoryLimitsBytes, String(BigInt(seven.totals.memoryLimitsBytes) + 320n * 1024n ** 2n));
+  assert.equal(nine.totals.emptyDirBytes, String(BigInt(seven.totals.emptyDirBytes) + 20n * 1024n));
+  assert.equal(nine.totals.pvcBytes, seven.totals.pvcBytes);
+  assert.deepEqual(nine.reserves, seven.reserves);
+  const verifier = nine.workloads.find(row => row.name === 'hupo-chat-cluster-verification');
+  assert.equal(verifier.memoryLimitsBytes, String(192n * 1024n ** 2n));
+  assert.equal(verifier.emptyDirBytes, String(20n * 1024n));
+  const tunnel = nine.workloads.find(row => row.name === 'hupo-chat-public');
+  assert.equal(tunnel.kind, 'Deployment');
+  assert.equal(tunnel.cpuRequestsNanocores, '25000000');
+  assert.equal(tunnel.memoryRequestsBytes, String(64n * 1024n ** 2n));
+  assert.equal(tunnel.memoryLimitsBytes, String(128n * 1024n ** 2n));
+  const runtimeInput = inputs();
+  runtimeInput.node.status.allocatable.pods = '10';
+  assert.equal(evaluate(runtimeInput, nine, 'node01', now).podSlots, false);
+  runtimeInput.node.status.allocatable.pods = '11';
+  assert.equal(evaluate(runtimeInput, nine, 'node01', now).podSlots, true);
+});
+
+for (const [field, invalid] of [
+  ['namespace', [undefined, '', 'other-namespace', 'hupо-chat', null, 1, false, {}, []]],
+  ['parallelism', [undefined, '', null, 0, 2, -1, 1.5, '1', true, {}, []]],
+  ['completions', [undefined, '', null, 0, 2, -1, 1.5, '1', true, {}, []]],
+  ['backoffLimit', [undefined, '', null, -1, 1, 0.5, '0', false, {}, []]],
+  ['restartPolicy', [undefined, '', 'OnFailure', 'Always', 'never', null, 1, true, {}, []]]
+]) {
+  test(`verification Job requires its explicit fixed ${field} in automatic and override sources`, async t => {
+    const fixture = await auxiliaryFixture(t);
+    await fixture.putAuxiliary(fixture.tunnelPath, fixture.tunnel);
+    const override = join(fixture.root, 'apps/reviewed-verification/job.yaml');
+    for (const path of [fixture.jobPath, override]) {
+      const read = () => fixture.builder.readSourcePlan(fixture.source, path === override ? path : undefined);
+      await fixture.putAuxiliary(path, fixture.job);
+      assert.equal((await read()).workloads.length, 9, 'real reviewed Job must load before mutation');
+      for (const value of invalid) {
+        const job = structuredClone(fixture.job);
+        const target = field === 'namespace' ? job.metadata : field === 'restartPolicy' ? job.spec.template.spec : job.spec;
+        if (value === undefined) delete target[field];
+        else target[field] = value;
+        await fixture.putAuxiliary(path, job);
+        await assert.rejects(read(), /^Error: PLAN_INVALID$/, `${field}=${JSON.stringify(value)}, ${path}`);
+      }
+      await fixture.putAuxiliary(path, fixture.job);
+    }
+  });
+}
+
+test('prepare reserves three complete copies while nine reviewed workloads require eleven pod slots', async t => {
+  const fixture = await auxiliaryFixture(t);
+  const canonical = await fixture.read();
+  assert.equal(canonical.workloads.length, 7);
+  assert.equal(canonical.workloads.reduce((sum, row) => sum + row.replicas, 0), 9);
+  await fixture.putAuxiliary(fixture.jobPath, fixture.job);
+  await fixture.putAuxiliary(fixture.tunnelPath, fixture.tunnel);
+  const plan = await fixture.read();
+  assert.equal(plan.workloads.length, 9);
+  assert.equal(plan.workloads.reduce((sum, row) => sum + row.replicas, 0), 11);
+  const prepare = plan.workloads.find(row => row.name === 'hupo-chat-prepare');
+  assert.deepEqual(prepare, { name: 'hupo-chat-prepare', kind: 'Job', replicas: 3,
+    cpuRequestsNanocores: '750000000', memoryRequestsBytes: String(2304n * 1024n ** 2n),
+    memoryLimitsBytes: String(6144n * 1024n ** 2n), storageBytes: '0', emptyDirBytes: String(1920n * 1024n ** 2n) });
+  assert.ok(plan.workloads.filter(row => row !== prepare).every(row => row.replicas === 1));
+  assert.deepEqual(plan.totals, { cpuRequestsNanocores: '1925000000', memoryRequestsBytes: '5368709120',
+    memoryLimitsBytes: '15032385536', pvcBytes: '45097156608', emptyDirBytes: '4311764992' });
+  assert.equal(BigInt(plan.totals.pvcBytes) + BigInt(plan.totals.emptyDirBytes) + BigInt(plan.reserves.diskBytes), 60146339840n);
+  assert.deepEqual(plan.reserves, canonical.reserves, 'retries must not spend any safety reserve');
+  const input = inputs();
+  input.node.status.allocatable.memory = '16Gi';
+  input.metrics.usage.memory = '2Gi';
+  assert.equal(evaluate(input, plan, 'node01', now).memoryUsage, false, 'the eleven-pod budget must not fabricate 16Gi headroom');
+  input.node.status.allocatable.pods = '10';
+  assert.equal(evaluate(input, plan, 'node01', now).podSlots, false);
+  input.node.status.allocatable.pods = '11';
+  assert.equal(evaluate(input, plan, 'node01', now).podSlots, true);
+  // Existing nonterminal copies remain additional; no phase or workload credit.
+  input.pods = [{ metadata: { name: 'existing-prepare' }, spec: { nodeName: 'node01',
+    containers: [{ name: 'app', resources: { requests: { cpu: '250m', memory: '768Mi' } } }] }, status: { phase: 'Pending' } }];
+  assert.equal(evaluate(input, plan, 'node01', now).podSlots, false);
+  input.node.status.allocatable.pods = '12';
+  assert.equal(evaluate(input, plan, 'node01', now).podSlots, true);
+});
+
+test('prepare rejects missing malformed or unreviewed retry bounds rather than understating its reservation', async t => {
+  const fixture = await auxiliaryFixture(t);
+  const original = await fixture.get('prepare.yaml');
+  assert.equal(original.spec.backoffLimit, 2);
+  assert.equal((await fixture.read()).workloads.length, 7, 'canonical source loads before mutation');
+  for (const value of [undefined, null, '', -1, 0, 1, 3, 2.5, '2', true, {}, [], Number.MAX_SAFE_INTEGER]) {
+    const doc = structuredClone(original);
+    if (value === undefined) delete doc.spec.backoffLimit;
+    else doc.spec.backoffLimit = value;
+    await fixture.put('prepare.yaml', doc);
+    await assert.rejects(fixture.read(), /^Error: PLAN_INVALID$/, `backoffLimit=${JSON.stringify(value)}`);
+  }
+});
+
+const retryPolicyBytes = Buffer.from('{"schemaVersion":1,"prepareBackoffLimit":2,"prepareConcurrentReservation":3,"otherWorkloadReservation":1}\n');
+
+test('frozen nine-pod raw inputs cannot reuse their revision for the selected eleven-pod policy', async t => {
+  const fixture = await auxiliaryFixture(t);
+  await fixture.putAuxiliary(fixture.jobPath, fixture.job);
+  await fixture.putAuxiliary(fixture.tunnelPath, fixture.tunnel);
+  // Restore only the three pre-rlimit commands to reproduce the reviewed v1 raw bytes.
+  const oldJob = (await readFile(new URL('../../hupo-chat-verification/base/job.yaml', import.meta.url), 'utf8'))
+    .replaceAll('Process.setrlimit(Process::RLIMIT_NPROC, 64, 64); ', '')
+    .replace('["ruby", "-e", "exec(\'ruby\', File.realpath(\'/opt/cluster-verify/collector.rb\'), \'--run-in-cluster\')"]',
+      '["ruby", "/opt/cluster-verify/collector.rb", "--run-in-cluster"]');
+  await writeFile(fixture.jobPath, oldJob);
+  await copyFile(new URL('../../hupo-chat-public/base/deployment.yaml', import.meta.url), fixture.tunnelPath);
+  const sources = await rawCanonicalSources(fixture.source);
+  sources.set('@verification/job.yaml', await readFile(fixture.jobPath));
+  sources.set('@tunnel/deployment.yaml', await readFile(fixture.tunnelPath));
+  const hash = entries => {
+    const digest = createHash('sha256');
+    for (const [path, raw] of [...entries].sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0)) digest.update(path + '\0').update(raw).update('\0');
+    return digest.digest('hex');
+  };
+  const oldRevision = hash(sources);
+  assert.equal(oldRevision, '977b99578eb3c2b7ead03059840053d563b8dca61bf75e71534bba0e7309cf45');
+  const plan = await fixture.read();
+  assert.notEqual(plan.revision, oldRevision, 'changed retry algorithm must not accept the old nine-pod report');
+  sources.set('@planner/retry-policy.json', retryPolicyBytes);
+  assert.equal(plan.revision, hash(sources));
+  assert.equal(plan.workloads.reduce((sum, row) => sum + row.replicas, 0), 11);
+  assert.equal(hash([...sources].reverse()), plan.revision, 'policy and raw path ordering is deterministic');
+});
+
+test('the additional tunnel must retain its explicit namespace replica and volume-free contract', async t => {
+  const fixture = await auxiliaryFixture(t);
+  await fixture.putAuxiliary(fixture.jobPath, fixture.job);
+  const cases = [
+    ['missing namespace', doc => { delete doc.metadata.namespace; }],
+    ['wrong namespace', doc => { doc.metadata.namespace = 'elsewhere'; }],
+    ['misplaced namespace', doc => { delete doc.metadata.namespace; doc.spec.template.metadata.namespace = 'hupo-chat'; }],
+    ['missing replicas', doc => { delete doc.spec.replicas; }],
+    ['volume declaration', doc => { doc.spec.template.spec.volumes = [{ name: 'scratch', emptyDir: { sizeLimit: '4Ki' } }]; }],
+    ['PVC reference', doc => { doc.spec.template.spec.volumes = [{ name: 'uploads', persistentVolumeClaim: { claimName: 'hupo-chat-uploads' } }]; }],
+    ['unbound mount', doc => { doc.spec.template.spec.containers[0].volumeMounts = [{ name: 'missing', mountPath: '/missing' }]; }],
+    ['block device', doc => { doc.spec.template.spec.containers[0].volumeDevices = [{ name: 'missing', devicePath: '/dev/missing' }]; }]
+  ];
+  for (const [name, mutate] of cases) {
+    const doc = structuredClone(fixture.tunnel);
+    mutate(doc);
+    await fixture.putAuxiliary(fixture.tunnelPath, doc);
+    await assert.rejects(fixture.read(), /^Error: PLAN_INVALID$/, name);
+  }
+});
+
+test('verification auxiliary volumes cannot introduce unbudgeted storage or unbound mounts', async t => {
+  const fixture = await auxiliaryFixture(t);
+  await fixture.putAuxiliary(fixture.tunnelPath, fixture.tunnel);
+  const cases = [
+    ['unknown PVC', pod => { pod.volumes.push({ name: 'unbudgeted', persistentVolumeClaim: { claimName: 'unknown-claim' } }); }],
+    ['host storage', pod => { pod.volumes.push({ name: 'unbudgeted', hostPath: { path: '/host' } }); }],
+    ['unbound mount', pod => { pod.containers[0].volumeMounts.push({ name: 'absent', mountPath: '/absent' }); }],
+    ['block device', pod => { pod.containers[0].volumeDevices = [{ name: 'absent', devicePath: '/dev/absent' }]; }],
+    ['duplicate volume', pod => { pod.volumes.push(structuredClone(pod.volumes[0])); }],
+    ['multiple volume sources', pod => { pod.volumes[0].emptyDir = { sizeLimit: '4Ki' }; }],
+    ['null volumes', pod => { pod.volumes = null; }],
+    ['null mounts', pod => { pod.containers[0].volumeMounts = null; }],
+    ['null emptyDir', pod => { pod.volumes.push({ name: 'unbounded', emptyDir: null }); }],
+    ['unbounded emptyDir', pod => { pod.volumes.push({ name: 'unbounded', emptyDir: { medium: 'Memory' } }); }]
+  ];
+  for (const [name, mutate] of cases) {
+    const job = structuredClone(fixture.job);
+    mutate(job.spec.template.spec);
+    await fixture.putAuxiliary(fixture.jobPath, job);
+    await assert.rejects(fixture.read(), /^Error: PLAN_INVALID$/, name);
+  }
+});
+
+test('canonical base source cannot escape the repository through its own directory junction', async t => {
+  const fixture = await auxiliaryFixture(t);
+  const outside = await mkdtemp(join(tmpdir(), 'preflight-external-base-'));
+  t.after(() => rm(outside, { recursive: true, force: true }));
+  const moved = join(outside, 'base');
+  await rename(fixture.source, moved);
+  await symlink(moved, fixture.source, 'junction');
+  await assert.rejects(fixture.read(), /^Error: PLAN_INVALID$/);
+});
+
+for (const type of ['job', 'tunnel']) {
+  test(`fixed ${type} source rejects wrong identities kinds placement and replicas`, async t => {
+    const fixture = await auxiliaryFixture(t);
+    await fixture.putAuxiliary(fixture.jobPath, fixture.job);
+    await fixture.putAuxiliary(fixture.tunnelPath, fixture.tunnel);
+    const path = fixture[`${type}Path`];
+    const cases = [
+      ['missing name', doc => { delete doc.metadata.name; }],
+      ['wrong name', doc => { doc.metadata.name = 'hupo-chat-unreviewed'; }],
+      ['wrong kind', doc => { doc.kind = type === 'job' ? 'Deployment' : 'Job'; }],
+      ['unsupported kind', doc => { doc.kind = 'List'; }],
+      ['wrong API', doc => { doc.apiVersion = 'unreviewed/v1'; }],
+      ['missing node', doc => { delete doc.spec.template.spec.nodeSelector; }],
+      ['wrong node', doc => { doc.spec.template.spec.nodeSelector['kubernetes.io/hostname'] = 'node02'; }],
+      ['misplaced node', doc => { doc.spec.nodeSelector = doc.spec.template.spec.nodeSelector; delete doc.spec.template.spec.nodeSelector; }],
+      ['conflicting nodeName', doc => { doc.spec.template.spec.nodeName = 'node02'; }]
+    ];
+    for (const value of [null, 0, -1, 2, 1.5, '1', true, {}]) {
+      cases.push([`invalid concurrency ${JSON.stringify(value)}`, doc => { doc.spec[type === 'job' ? 'parallelism' : 'replicas'] = value; }]);
+    }
+    if (type === 'tunnel') for (const strategy of [undefined, { type: 'RollingUpdate' }]) {
+      cases.push(['unbounded rollout', doc => { doc.spec.strategy = strategy; }]);
+    }
+    for (const [name, mutate] of cases) {
+      const doc = structuredClone(fixture[type]);
+      mutate(doc);
+      await fixture.putAuxiliary(path, doc);
+      await assert.rejects(fixture.read(), /^Error: PLAN_INVALID$/, name);
+    }
+    await fixture.putAuxiliary(path, fixture[type]);
+    await fixture.put(`duplicate-${type}.yaml`, fixture[type]);
+    const graph = await fixture.get('kustomization.yaml');
+    graph.resources.push(`duplicate-${type}.yaml`);
+    await fixture.put('kustomization.yaml', graph);
+    await assert.rejects(fixture.read(), /^Error: PLAN_INVALID$/, 'duplicate fixed workload');
+  });
+
+  test(`fixed ${type} source rejects escaping junctions but accepts contained junctions`, async t => {
+    const fixture = await auxiliaryFixture(t);
+    await fixture.putAuxiliary(fixture.jobPath, fixture.job);
+    await fixture.putAuxiliary(fixture.tunnelPath, fixture.tunnel);
+    const original = await fixture.read();
+    const directory = dirname(fixture[`${type}Path`]);
+    const inside = directory + '-reviewed';
+    await rename(directory, inside);
+    await symlink(inside, directory, 'junction');
+    assert.deepEqual(await fixture.read(), original);
+    await rm(directory);
+    const outside = await mkdtemp(join(tmpdir(), 'preflight-external-aux-'));
+    t.after(() => rm(outside, { recursive: true, force: true }));
+    await cp(inside, join(outside, 'base'), { recursive: true });
+    await symlink(join(outside, 'base'), directory, 'junction');
+    await assert.rejects(fixture.read(), /^Error: PLAN_INVALID$/);
+  });
+}
+
+for (const placement of ['tunnel', 'collector', 'encryptor', 'publisher', 'regular sidecar', 'restartable init']) {
+  test(`nine-workload parser preserves the positive memory guard for ${placement}`, async t => {
+    const fixture = await auxiliaryFixture(t);
+    await fixture.putAuxiliary(fixture.jobPath, fixture.job);
+    await fixture.putAuxiliary(fixture.tunnelPath, fixture.tunnel);
+    const type = placement === 'tunnel' ? 'tunnel' : 'job';
+    const doc = structuredClone(fixture[type]);
+    const pod = doc.spec.template.spec;
+    let target = placement === 'collector' ? pod.initContainers[0] :
+      placement === 'encryptor' ? pod.initContainers[1] : pod.containers[0];
+    if (placement === 'regular sidecar' || placement === 'restartable init') {
+      target = structuredClone(pod.containers[0]);
+      target.name = 'bounded-helper';
+      if (placement === 'regular sidecar') pod.containers.push(target);
+      else { target.restartPolicy = 'Always'; pod.initContainers.push(target); }
+    }
+    target.resources.requests.memory = '0';
+    for (const podCap of [undefined, '512Mi']) {
+      pod.resources = podCap ? { limits: { memory: podCap } } : undefined;
+      for (const invalid of [undefined, '', 'not-memory', '-1Mi', '0', '0Mi', '+0', '.0Gi', '0e3', 0, null, {}, true]) {
+        target.resources.limits.memory = invalid;
+        await fixture.putAuxiliary(fixture[`${type}Path`], doc);
+        await assert.rejects(fixture.read(), /^Error: PLAN_INVALID$/, `${placement}, ${JSON.stringify(invalid)}, pod cap ${podCap}`);
+      }
+    }
+  });
+}
+
+test('nine-workload auxiliaries still allow zero CPU and requests with positive memory caps', async t => {
+  const fixture = await auxiliaryFixture(t);
+  const seven = await fixture.read();
+  for (const type of ['job', 'tunnel']) {
+    const doc = structuredClone(fixture[type]);
+    const pod = doc.spec.template.spec;
+    for (const container of [...pod.containers, ...(pod.initContainers || [])]) {
+      container.resources.requests = { cpu: '0', memory: '0' };
+      container.resources.limits.cpu = '0';
+    }
+    await fixture.putAuxiliary(fixture[`${type}Path`], doc);
+  }
+  const nine = await fixture.read();
+  assert.equal(nine.workloads.length, 9);
+  assert.equal(nine.totals.cpuRequestsNanocores, seven.totals.cpuRequestsNanocores);
+  assert.equal(nine.totals.memoryRequestsBytes, seven.totals.memoryRequestsBytes);
+  assert.equal(BigInt(nine.totals.memoryLimitsBytes) - BigInt(seven.totals.memoryLimitsBytes), 320n * 1024n ** 2n);
+});
+
+async function rawCanonicalSources(source) {
+  const entries = new Map();
+  async function visit(path) {
+    if ((await stat(join(source, path))).isDirectory()) return visit(join(path, 'kustomization.yaml'));
+    const raw = await readFile(join(source, path));
+    const doc = JSON.parse(raw);
+    if (doc.kind === 'Kustomization') {
+      entries.set(path.replaceAll('\\', '/'), raw);
+      for (const generator of doc.configMapGenerator || []) for (const entry of generator.files || []) {
+        const file = join(dirname(path), entry.includes('=') ? entry.slice(entry.indexOf('=') + 1) : entry);
+        entries.set(file.replaceAll('\\', '/'), await readFile(join(source, file)));
+      }
+      for (const child of doc.resources) await visit(join(dirname(path), child));
+    } else if (['Job', 'Deployment', 'StatefulSet', 'PersistentVolumeClaim'].includes(doc.kind)) {
+      entries.set(path.replaceAll('\\', '/'), raw);
+    }
+  }
+  await visit('');
+  return entries;
+}
+
+test('nine-workload revision binds both exact auxiliary files with separate stable hash paths', async t => {
+  const fixture = await auxiliaryFixture(t);
+  await fixture.putAuxiliary(fixture.jobPath, fixture.job);
+  await fixture.putAuxiliary(fixture.tunnelPath, fixture.tunnel);
+  const plan = await fixture.read();
+  const sources = await rawCanonicalSources(fixture.source);
+  sources.set('@verification/job.yaml', await readFile(fixture.jobPath));
+  sources.set('@tunnel/deployment.yaml', await readFile(fixture.tunnelPath));
+  const expected = createHash('sha256');
+  sources.set('@planner/retry-policy.json', retryPolicyBytes);
+  for (const [path, raw] of [...sources].sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0)) {
+    expected.update(path + '\0').update(raw).update('\0');
+  }
+  assert.equal(plan.revision, expected.digest('hex'));
+  for (const path of [fixture.jobPath, fixture.tunnelPath]) {
+    await writeFile(path, (await readFile(path, 'utf8')) + '\n');
+    const changed = await fixture.read();
+    assert.notEqual(changed.revision, plan.revision);
+    assert.deepEqual(changed.totals, plan.totals);
+  }
+  delete fixture.tunnel.metadata.annotations;
+  await fixture.putAuxiliary(fixture.tunnelPath, fixture.tunnel);
+  assert.deepEqual((await fixture.read()).totals, plan.totals);
+});
+
+test('default CLI check rejects changed missing or duplicate auxiliary inputs without scanning basenames', async t => {
+  const fixture = await auxiliaryFixture(t);
+  await fixture.putAuxiliary(fixture.jobPath, fixture.job);
+  await fixture.putAuxiliary(fixture.tunnelPath, fixture.tunnel);
+  const plan = await fixture.builder.generate(fixture.source);
+  assert.equal(plan.workloads.length, 9);
+  const run = promisify(execFile);
+  const check = () => run(process.execPath, [fixture.script, '--check'], { cwd: fixture.root, timeout: 10000 });
+  assert.equal(JSON.parse((await check()).stdout).revision, plan.revision);
+  for (const type of ['job', 'tunnel']) {
+    const path = fixture[`${type}Path`];
+    const bytes = await readFile(path);
+    await writeFile(path, Buffer.concat([bytes, Buffer.from('\n')]));
+    await assert.rejects(check(), error => error.code === 1 && /\r?\nError: PLAN_CHANGED\r?\n/.test(error.stderr));
+    await writeFile(path, bytes);
+    const decoy = path + '.not-the-fixed-file';
+    await rename(path, decoy);
+    await assert.rejects(check(), error => error.code === 1 && /\r?\nError: PLAN_CHANGED\r?\n/.test(error.stderr));
+    await rename(decoy, path);
+  }
+  const outside = await mkdtemp(join(tmpdir(), 'preflight-explicit-outside-'));
+  t.after(() => rm(outside, { recursive: true, force: true }));
+  const path = join(outside, 'job.yaml');
+  await writeFile(path, JSON.stringify(fixture.job));
+  await assert.rejects(fixture.builder.readSourcePlan(fixture.source, path), /^Error: PLAN_INVALID$/);
+  await fixture.put('duplicate-job.yaml', fixture.job);
+  const graph = await fixture.get('kustomization.yaml');
+  graph.resources.push('duplicate-job.yaml');
+  await fixture.put('kustomization.yaml', graph);
+  await assert.rejects(check(), error => error.code === 1 && /\r?\nError: PLAN_INVALID\r?\n/.test(error.stderr));
 });

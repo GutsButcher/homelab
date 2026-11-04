@@ -1,9 +1,19 @@
 {
   "schemaVersion": 1,
-  "revision": "e8909a962f275e21148ac2674862b6da51e4616ac8170107d8e11e60d1159523",
+  "revision": "175d7b412699d7fd1a4610bc0be672ec98e5f0b49f4b6e04bfc88f6dbda87892",
   "targetNode": "node01",
   "source": "homelab/apps/hupo-chat/base (JSON manifests)",
   "workloads": [
+    {
+      "name": "hupo-chat-cluster-verification",
+      "kind": "Job",
+      "replicas": 1,
+      "cpuRequestsNanocores": "25000000",
+      "memoryRequestsBytes": "67108864",
+      "memoryLimitsBytes": "201326592",
+      "storageBytes": "0",
+      "emptyDirBytes": "20480"
+    },
     {
       "name": "hupo-chat-namespace-secrets",
       "kind": "Job",
@@ -37,12 +47,22 @@
     {
       "name": "hupo-chat-prepare",
       "kind": "Job",
-      "replicas": 1,
-      "cpuRequestsNanocores": "250000000",
-      "memoryRequestsBytes": "805306368",
-      "memoryLimitsBytes": "2147483648",
+      "replicas": 3,
+      "cpuRequestsNanocores": "750000000",
+      "memoryRequestsBytes": "2415919104",
+      "memoryLimitsBytes": "6442450944",
       "storageBytes": "0",
-      "emptyDirBytes": "671088640"
+      "emptyDirBytes": "2013265920"
+    },
+    {
+      "name": "hupo-chat-public",
+      "kind": "Deployment",
+      "replicas": 1,
+      "cpuRequestsNanocores": "25000000",
+      "memoryRequestsBytes": "67108864",
+      "memoryLimitsBytes": "134217728",
+      "storageBytes": "0",
+      "emptyDirBytes": "0"
     },
     {
       "name": "hupo-chat-redis",
@@ -76,11 +96,11 @@
     }
   ],
   "totals": {
-    "cpuRequestsNanocores": "1375000000",
-    "memoryRequestsBytes": "3623878656",
-    "memoryLimitsBytes": "10401873920",
+    "cpuRequestsNanocores": "1925000000",
+    "memoryRequestsBytes": "5368709120",
+    "memoryLimitsBytes": "15032385536",
     "pvcBytes": "45097156608",
-    "emptyDirBytes": "2969567232"
+    "emptyDirBytes": "4311764992"
   },
   "reserves": {
     "cpuNanocores": "250000000",

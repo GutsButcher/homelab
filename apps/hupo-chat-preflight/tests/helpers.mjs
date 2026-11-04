@@ -3,7 +3,7 @@ export const plan = JSON.parse(await readFile(new URL('../base/plan.json', impor
 export const now = Date.parse('2026-11-03T00:00:00Z');
 export function inputs() {
   return { node: { metadata: { name: 'node01' }, spec: {}, status: {
-    allocatable: { cpu: '4', memory: '16Gi', pods: '110' },
+    allocatable: { cpu: '4', memory: '20Gi', pods: '110' },
     conditions: [{ type: 'Ready', status: 'True' }, ...['MemoryPressure', 'DiskPressure', 'PIDPressure']
       .map(type => ({ type, status: 'False' }))] } }, pods: [],
     metrics: { metadata: { name: 'node01' }, timestamp: new Date(now).toISOString(), window: '30s',

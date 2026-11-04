@@ -86,8 +86,20 @@ work retains the refresh lock until settled; late success cannot overwrite failu
 - `base/plan.json` and generated `PLAN.md` derive from the actual JSON manifests
   in the canonical sibling `../hupo-chat/base` (`homelab/apps/hupo-chat/base`),
   not a private mirror, for web, worker, postgres, redis, prepare and every declared
-  app PVC. Prepare overlaps steady-state workloads conservatively. See `PLAN.md` for exact totals,
+  app PVC, namespace generation and owner bootstrap. The selected retry policy reserves
+  **eleven pods for nine workload rows**: three full prepare copies (explicit
+  `backoffLimit=2` plus its initial copy) and one of every other workload, including
+  the actual public verification Job and tunnel Deployment. Configured source
+  parallelism/replicas still must be one; this is not permission to scale a source.
+  See `PLAN.md` for exact totals,
   reserves, request/usage comparisons and disk arithmetic; do not hand-edit totals.
+  The new revision hashes versioned `@planner/retry-policy.json` bytes as well as
+  the raw resource inputs. An older nine-pod report cannot accept this policy.
+  Both retries are charged in full, including emptyDirs; reserves are not spent.
+  Current nonterminal pods and actual usage remain additional. This bounded
+  declared-retry reservation is not a universal controller/external-deletion cap.
+  Canonical copies without auxiliaries have seven rows and nine planned pods,
+  not acceptance for auxiliary activation. No phase or existing-workload credit is used.
 - Candidate **node01** is a deliberate documented-worker choice, **not a live
   discovery**. Deployment selector, exact-node RBAC, generator and runtime allowlist
   agree. Changing it requires reviewing all four and the contract tests together;
@@ -186,20 +198,42 @@ node tools/build-plan.mjs
 Preferred isolated test runner, with an **explicitly approved disposable Docker
 endpoint** (not a production/ambient Docker context). Bind source read-only;
 no port publication or external network. On Windows, use a native `C:/...`
-source path, not `/c/...`:
+source path, not `/c/...`. All four directories must come from the **same selected
+immutable public checkout**; never mix a deployed old preflight with new auxiliaries:
 
 ```sh
 : "${PREFLIGHT_TEST_DOCKER_HOST:?set the approved disposable endpoint}"
-docker --host "$PREFLIGHT_TEST_DOCKER_HOST" run --rm --network none --read-only \
-  --user 1000:1000 --cap-drop ALL --security-opt no-new-privileges \
-  --memory 256m --cpus 1 --tmpfs=/tmp:rw,noexec,nosuid,size=16m,mode=1777 \
+: "${PREFLIGHT_TEST_DOCKER_CONFIG:?set an empty isolated client-config directory}"
+docker --config "$PREFLIGHT_TEST_DOCKER_CONFIG" --host "$PREFLIGHT_TEST_DOCKER_HOST" run --rm --network none --read-only \
+  --user 65532:65532 --cap-drop ALL --security-opt no-new-privileges \
+  --memory 256m --memory-swap 256m --pids-limit 64 --cpus 1 --tmpfs=/tmp:rw,noexec,nosuid,size=16m,mode=1777 \
   --env HUPO_CONTAINER_STARTUP_TESTS=1 \
-  --mount "type=bind,src=C:/Users/Kaido/work/homelab/apps/hupo-chat-preflight,dst=/apps/hupo-chat-preflight,readonly" \
-  --mount "type=bind,src=C:/Users/Kaido/work/homelab/apps/hupo-chat,dst=/apps/hupo-chat,readonly" \
-  --workdir /apps/hupo-chat-preflight \
+  --mount "type=bind,src=C:/Users/Kaido/work/homelab/apps/hupo-chat-preflight,dst=/work/apps/hupo-chat-preflight,readonly" \
+  --mount "type=bind,src=C:/Users/Kaido/work/homelab/apps/hupo-chat,dst=/work/apps/hupo-chat,readonly" \
+  --mount "type=bind,src=C:/Users/Kaido/work/homelab/apps/hupo-chat-verification,dst=/work/apps/hupo-chat-verification,readonly" \
+  --mount "type=bind,src=C:/Users/Kaido/work/homelab/apps/hupo-chat-public,dst=/work/apps/hupo-chat-public,readonly" \
+  --workdir /work/apps/hupo-chat-preflight --entrypoint node \
   node:24.22.2-bookworm-slim@sha256:c86ecead9e55a5210ac1727de38a4ca840bf03dcaf34dc9749addbf383b1920c \
-  node --test --test-concurrency=1
+  --max-old-space-size=64 --test --test-concurrency=1
 ```
+
+The private native CI harness adds only the two fixed read-only auxiliary binds
+above, without mounting the checkout root, `.git`, `.env`, credential/token roots
+or any private repository source. Auxiliary directories are optional only as a
+pair for an older checkout without either directory; when either exists, both
+fixed resources (`base/job.yaml`, `base/deployment.yaml`) are mandatory. Missing,
+linked/junction-redirected, escaped or comma-separated mount sources fail closed.
+This legacy fallback does not make old source evidence accept the new candidate.
+The two private `ci/support_container_tests.py` and `ci/test_support_workflow.py`
+changes need separate source review and publication before running the exact new
+public revision through native CI. The workflow's immutable-input/contents-read
+guards are unchanged. Its separate budget stage runs `tools/build-plan.mjs --check`
+without the container-startup test flag.
+
+The auxiliary source remains INERT. Exact-image Node 24 tests and a fresh live
+snapshot matching this eleven-pod revision, with all eight checks passing, are
+still required before activation. Source generation and host Node 22 tests do not
+establish native acceptance, main application health or live capacity.
 
 Most tests use stdlib fixtures and injected transports/server objects. Entry-path
 tests create and remove isolated temporary fixtures. The actual ConfigMap-linked
