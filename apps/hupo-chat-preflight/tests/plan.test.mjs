@@ -9,14 +9,18 @@ const budget = await import('../tools/build-plan.mjs').catch(error => {
 });
 
 export function documents() {
-  const work = ['web', 'worker', 'postgres', 'redis', 'prepare'].map(component => ({
-    apiVersion: 'apps/v1', kind: component === 'prepare' ? 'Job' : 'StatefulSet',
-    metadata: { name: `hupo-chat-${component}` }, spec: { replicas: 1, template: { spec: {
+  const kinds = { web: 'Deployment', worker: 'Deployment', postgres: 'StatefulSet', redis: 'StatefulSet',
+    prepare: 'Job', 'namespace-secrets': 'Job', 'owner-bootstrap': 'Job' };
+  const work = Object.entries(kinds).map(([component, kind]) => ({
+    apiVersion: kind === 'Job' ? 'batch/v1' : 'apps/v1', kind,
+    metadata: { name: `hupo-chat-${component}` }, spec: { replicas: 1,
+      ...(kind === 'Deployment' ? { strategy: { type: 'Recreate' } } : {}), template: { spec: {
+      nodeSelector: { 'kubernetes.io/hostname': 'node01' },
       containers: [{ resources: { requests: { cpu: '100m', memory: '64Mi' },
         limits: { cpu: '1', memory: '128Mi' } } }], volumes: [{ emptyDir: { sizeLimit: '1Mi' } }] } },
     volumeClaimTemplates: component === 'postgres' ? [{ spec: { resources: { requests: { storage: '2Gi' } } } }] : [] }
   }));
-  return [...work, { kind: 'PersistentVolumeClaim', metadata: { name: 'uploads' },
+  return [...work, { apiVersion: 'v1', kind: 'PersistentVolumeClaim', metadata: { name: 'uploads' },
     spec: { resources: { requests: { storage: '3Gi' } } } }];
 }
 
@@ -36,14 +40,23 @@ test('generator arguments default to the canonical sibling independently of cwd'
   assert.deepEqual(budget.parseArguments(['--check', override]), { source: override, check: true });
 });
 
-test('plan sums every workload including prepare overlap, all claims and explicit reserves', () => {
+test('generator arguments accept an explicit additional verification job without treating flags as paths', () => {
+  assert.deepEqual(budget.parseArguments(['--additional-job', 'verifier/job.yaml', '--check', 'base']),
+    { source: 'base', check: true, additionalJobPath: 'verifier/job.yaml' });
+  for (const args of [['--additional-job'], ['--unknown'], ['one', 'two'], ['--check', '--check']]) {
+    assert.throws(() => budget.parseArguments(args), /PLAN_INVALID/);
+  }
+});
+
+test('plan sums all seven workloads concurrently, all claims and explicit reserves', () => {
   assert.equal(typeof budget.buildPlan, 'function');
   const plan = budget.buildPlan(documents(), 'a'.repeat(64));
   assert.equal(plan.targetNode, 'node01');
-  assert.equal(plan.totals.cpuRequestsNanocores, String(5n * 100000000n));
-  assert.equal(plan.totals.memoryLimitsBytes, String(5n * 128n * 1024n ** 2n));
+  assert.equal(plan.workloads.length, 7);
+  assert.equal(plan.totals.cpuRequestsNanocores, String(7n * 100000000n));
+  assert.equal(plan.totals.memoryLimitsBytes, String(7n * 128n * 1024n ** 2n));
   assert.equal(plan.totals.pvcBytes, String(5n * 1024n ** 3n));
-  assert.equal(plan.totals.emptyDirBytes, String(5n * 1024n ** 2n));
+  assert.equal(plan.totals.emptyDirBytes, String(7n * 1024n ** 2n));
   assert.equal(plan.reserves.diskBytes, String(10n * 1024n ** 3n));
   assert.equal(plan.reserves.memoryBytes, String(1024n ** 3n));
   assert.equal(plan.reserves.cpuNanocores, '250000000');
@@ -74,9 +87,80 @@ test('plan provenance identifies the canonical homelab source, not a private mir
 test('generated rationale records computed exact budgets and snapshot limitations', () => {
   assert.equal(typeof budget.explainPlan, 'function');
   const text = budget.explainPlan(budget.buildPlan(documents(), 'a'.repeat(64)));
-  assert.match(text, /500m/);
-  assert.match(text, /640Mi/);
+  assert.match(text, /700m/);
+  assert.match(text, /896Mi/);
   assert.match(text, /Snapshot/);
   assert.match(text, /zero future/);
   assert.match(text, /node01/);
+  assert.match(text, /Source budget only/);
+  assert.match(text, /all seven canonical workloads concurrently/);
+  assert.match(text, /Verification job is not included/);
+  assert.match(text, /1Gi reserve does not prove/);
+  assert.match(text, /Every regular and init container.*explicit positive memory limit/);
+  assert.match(text, /even with a positive pod-level memory cap/);
+});
+
+test('workload output order is deterministic for the same source documents', () => {
+  assert.deepEqual(budget.buildPlan(documents().reverse(), 'a'.repeat(64)),
+    budget.buildPlan(documents(), 'a'.repeat(64)));
+});
+
+test('every workload must retain its reviewed kind', () => {
+  for (let index = 0; index < 7; index++) {
+    const changed = documents();
+    changed[index].kind = changed[index].kind === 'Job' ? 'Deployment' : 'Job';
+    assert.throws(() => budget.buildPlan(changed, 'a'.repeat(64)), /PLAN_INVALID/, changed[index].metadata.name);
+  }
+});
+
+test('every workload must have exactly one concurrent replica', () => {
+  for (let index = 0; index < 7; index++) {
+    for (const replicas of [null, 0, 2, -1, 1.5, '1']) {
+      const changed = documents();
+      changed[index].spec[changed[index].kind === 'Job' ? 'parallelism' : 'replicas'] = replicas;
+      assert.throws(() => budget.buildPlan(changed, 'a'.repeat(64)), /PLAN_INVALID/);
+    }
+  }
+});
+
+test('deployments cannot add unbudgeted rolling-update surge pods', () => {
+  for (const strategy of [undefined, { type: 'RollingUpdate' }]) {
+    const changed = documents();
+    changed[0].spec.strategy = strategy;
+    assert.throws(() => budget.buildPlan(changed, 'a'.repeat(64)), /PLAN_INVALID/);
+  }
+});
+
+test('all storage declarations must have positive explicit bounds', () => {
+  for (const value of [undefined, '0', '0Mi']) {
+    for (const target of ['pvc', 'template', 'emptyDir']) {
+      const changed = documents();
+      if (target === 'pvc') changed.at(-1).spec.resources.requests.storage = value;
+      if (target === 'template') changed[2].spec.volumeClaimTemplates[0].spec.resources.requests.storage = value;
+      if (target === 'emptyDir') changed[0].spec.template.spec.volumes[0].emptyDir.sizeLimit = value;
+      assert.throws(() => budget.buildPlan(changed, 'a'.repeat(64)), /(?:PLAN|QUANTITY)_INVALID/, target);
+    }
+  }
+});
+
+test('generic ephemeral volume claim templates are included in storage totals', () => {
+  const changed = documents();
+  changed[5].spec.template.spec.volumes.push({ name: 'scratch-claim', ephemeral: {
+    volumeClaimTemplate: { spec: { resources: { requests: { storage: '1Gi' } } } } } });
+  const plan = budget.buildPlan(changed, 'a'.repeat(64));
+  assert.equal(plan.totals.pvcBytes, String(6n * 1024n ** 3n));
+  assert.equal(plan.workloads.find(row => row.name === 'hupo-chat-namespace-secrets').storageBytes, String(1024n ** 3n));
+});
+
+test('every workload must be pinned to node01 without a conflicting nodeName', () => {
+  for (let index = 0; index < 7; index++) {
+    for (const pin of [undefined, {}, { 'kubernetes.io/hostname': 'node02' }]) {
+      const changed = documents();
+      changed[index].spec.template.spec.nodeSelector = pin;
+      assert.throws(() => budget.buildPlan(changed, 'a'.repeat(64)), /PLAN_INVALID/);
+    }
+    const changed = documents();
+    changed[index].spec.template.spec.nodeName = 'node02';
+    assert.throws(() => budget.buildPlan(changed, 'a'.repeat(64)), /PLAN_INVALID/);
+  }
 });
