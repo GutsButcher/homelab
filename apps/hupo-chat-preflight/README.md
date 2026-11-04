@@ -170,6 +170,14 @@ the pod 0. The standalone subtree creates no Namespace and changes no controller
 workload. Remove the temporary permission with the preflight when no longer
 needed. Do not broaden it to work around a 403.
 
+## Observation-only state diagnostic
+
+`X-Hupo-State-Diagnostic` adds bounded memory-deficit and qualified Argo hints on
+existing report GET/HEAD responses. The report JSON and full eleven-slot policy
+are unchanged. It never verifies phase admission. See `DIAGNOSTIC.md` for the
+versioned record, fixed byte fingerprint, unknown cases, inert read permission
+and remaining native/live gates. No Application source is promoted by this change.
+
 ## Offline verification (no app/server startup)
 
 From `apps/hupo-chat-preflight`, using an already installed Node:
@@ -180,6 +188,7 @@ kubectl kustomize base > /dev/null
 kubectl kustomize prod > /dev/null
 kubectl kustomize . > /dev/null
 kubectl kustomize cert-reader-access > /dev/null
+kubectl kustomize state-reader-access > /dev/null
 node tools/build-plan.mjs --check
 # Explicit source override, when needed:
 node tools/build-plan.mjs ../hupo-chat/base --check

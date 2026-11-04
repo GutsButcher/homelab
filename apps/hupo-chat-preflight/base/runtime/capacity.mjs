@@ -29,6 +29,25 @@ export function evaluate(input, plan, ownNode, now) {
   };
 }
 
+export function fullPolicyMemoryDeficit(input, plan, ownNode, now) {
+  try {
+    if (!Number.isFinite(now) || ownNode !== plan.targetNode || input.node?.metadata?.name !== ownNode) throw new Error();
+    validateMetrics(input.metrics, ownNode, now);
+    quantity(input.metrics.usage.cpu, 'cpu');
+    const limit = policyBytes(plan.totals.memoryLimitsBytes);
+    const reserve = policyBytes(plan.reserves.memoryBytes);
+    if (limit === 0n) throw new Error();
+    const memory = quantity(input.node.status?.allocatable?.memory, 'memory');
+    if (memory === 0n) throw new Error();
+    const allocated = allocatedRequests(input.pods, ownNode).memory;
+    const usage = quantity(input.metrics.usage.memory, 'memory');
+    const deficit = max(0n, max(allocated, usage) + limit + reserve - memory);
+    const rounded = (deficit + 1048575n) / 1048576n;
+    if (rounded > BigInt(Number.MAX_SAFE_INTEGER)) throw new Error();
+    return { state: 'KNOWN', fullPolicyDeficitMi: Number(rounded) };
+  } catch { return { state: 'UNKNOWN', fullPolicyDeficitMi: null }; }
+}
+
 function validateMetrics(metrics, nodeName, now) {
   if (metrics?.metadata?.name !== nodeName || metrics.usage?.cpu === undefined || metrics.usage?.memory === undefined) throw new Error('METRICS_UNAVAILABLE');
   const timestamp = Date.parse(metrics.timestamp);
@@ -44,6 +63,13 @@ function diskHeadroom(disk, required, inodeReserve) {
   }
   if (disk.bsize === 0n || disk.files === 0n || disk.ffree > disk.files) throw new Error('DISK_UNAVAILABLE');
   return disk.bsize * disk.bavail >= required && disk.ffree >= inodeReserve;
+}
+
+function policyBytes(value) {
+  if (typeof value !== 'string' || !/^\d{1,31}$/.test(value)) throw new Error();
+  const bytes = BigInt(value);
+  if (bytes > 2n ** 100n) throw new Error();
+  return bytes;
 }
 
 function max(a, b) { return a > b ? a : b; }

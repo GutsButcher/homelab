@@ -1,21 +1,21 @@
 import { createServer } from 'node:http';
-import { readFile } from 'node:fs/promises';
 import { realpathSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { createHandler } from './endpoint.mjs';
 import { PublicEndpointDiscovery } from './public-endpoint.mjs';
 import { ReportCache, observe } from './snapshot.mjs';
 import { KubeReader, fetchAuthenticatedCertificate, readOwnDisk } from './upstream.mjs';
+import { loadProducer } from './producer.mjs';
 
 export class PreflightService {
   #timer = null;
 
-  constructor({ plan, ownNode, provider = { reader: new KubeReader(), readDisk: readOwnDisk,
+  constructor({ plan, producerSha256, ownNode, provider = { reader: new KubeReader(), readDisk: readOwnDisk,
     readCert: fetchAuthenticatedCertificate, certificateSource: 'kubernetes-api-service-proxy-v1' },
     publicEndpoint, makeServer = createServer, schedule = setInterval, cancel = clearInterval }) {
     this.publicEndpoint = publicEndpoint;
-    this.cache = new ReportCache({ plan, clock: provider.clock || Date.now,
-      collect: signal => observe(plan, ownNode, provider, signal) });
+    this.cache = new ReportCache({ plan, producerSha256, clock: provider.clock || Date.now,
+      collect: (signal, deadline) => observe(plan, ownNode, provider, signal, deadline) });
     this.schedule = schedule;
     this.cancel = cancel;
     this.server = makeServer({ requestTimeout: 5000, headersTimeout: 4000, keepAliveTimeout: 1000,
@@ -61,8 +61,8 @@ export function isMainModule(entrypoint, moduleUrl) {
 
 if (isMainModule(process.argv[1], import.meta.url)) {
   try {
-    const plan = JSON.parse(await readFile(new URL('./plan.json', import.meta.url), 'utf8'));
-    const service = new PreflightService({ plan, ownNode: process.env.NODE_NAME,
+    const { plan, producerSha256 } = await loadProducer();
+    const service = new PreflightService({ plan, producerSha256, ownNode: process.env.NODE_NAME,
       publicEndpoint: new PublicEndpointDiscovery() });
     service.start();
     process.once('SIGTERM', () => { void service.stop(); });

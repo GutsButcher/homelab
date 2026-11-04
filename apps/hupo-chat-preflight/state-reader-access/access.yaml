@@ -1,0 +1,29 @@
+{
+  "apiVersion": "v1",
+  "kind": "List",
+  "items": [
+    {
+      "apiVersion": "rbac.authorization.k8s.io/v1",
+      "kind": "Role",
+      "metadata": {
+        "name": "hupo-chat-preflight-state-reader",
+        "namespace": "argocd",
+        "annotations": {"argocd.argoproj.io/sync-wave": "-20"}
+      },
+      "rules": [
+        {"apiGroups": ["argoproj.io"], "resources": ["applications"], "resourceNames": ["hupo-chat"], "verbs": ["get"]}
+      ]
+    },
+    {
+      "apiVersion": "rbac.authorization.k8s.io/v1",
+      "kind": "RoleBinding",
+      "metadata": {
+        "name": "hupo-chat-preflight-state-reader",
+        "namespace": "argocd",
+        "annotations": {"argocd.argoproj.io/sync-wave": "-20"}
+      },
+      "roleRef": {"apiGroup": "rbac.authorization.k8s.io", "kind": "Role", "name": "hupo-chat-preflight-state-reader"},
+      "subjects": [{"kind": "ServiceAccount", "name": "hupo-chat-preflight", "namespace": "hupo-chat-preflight"}]
+    }
+  ]
+}

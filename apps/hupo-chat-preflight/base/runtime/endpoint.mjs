@@ -8,8 +8,11 @@ export function createHandler(cache, { certificateSource, publicEndpoint } = {})
       return send(request, response, 405, { error: 'METHOD_NOT_ALLOWED' }, 'application/json', { Allow: 'GET, HEAD' });
     }
     if (request.url === '/healthz') return send(request, response, 200, { healthy: true });
-    if (request.url === '/report') return send(request, response, 200, cache.report(),
-      'application/json', publicEndpointHeaders(publicEndpoint));
+    if (request.url === '/report') {
+      const report = cache.report();
+      return send(request, response, 200, report, 'application/json',
+        { ...publicEndpointHeaders(publicEndpoint), ...cache.diagnostic?.(report) });
+    }
     if (request.url === '/certificate') {
       const pem = cache.certificate();
       return pem ? send(request, response, 200, pem, 'application/x-pem-file', provenance) :

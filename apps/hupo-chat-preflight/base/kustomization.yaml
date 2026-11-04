@@ -23,6 +23,9 @@
         "runtime/upstream.mjs",
         "runtime/endpoint.mjs",
         "runtime/public-endpoint.mjs",
+        "runtime/application.mjs",
+        "runtime/diagnostic.mjs",
+        "runtime/producer.mjs",
         "runtime/server.mjs"
       ]
     }
