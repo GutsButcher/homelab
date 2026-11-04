@@ -1,0 +1,27 @@
+{
+  "apiVersion": "argoproj.io/v1alpha1",
+  "kind": "Application",
+  "metadata": {
+    "name": "hupo-chat",
+    "namespace": "argocd",
+    "annotations": {"argocd.argoproj.io/sync-wave": "10"},
+    "finalizers": ["resources-finalizer.argocd.argoproj.io"]
+  },
+  "spec": {
+    "project": "homelab",
+    "destination": {
+      "server": "https://kubernetes.default.svc",
+      "namespace": "hupo-chat"
+    },
+    "source": {
+      "repoURL": "https://github.com/GutsButcher/homelab.git",
+      "targetRevision": "4b88cf5f984404cf0539811127dbe66cfd38c18a",
+      "path": "apps/hupo-chat/prod"
+    },
+    "syncPolicy": {
+      "automated": {"prune": true, "selfHeal": true, "allowEmpty": false},
+      "syncOptions": ["CreateNamespace=true", "ServerSideApply=true", "RespectIgnoreDifferences=true"],
+      "retry": {"limit": 5, "backoff": {"duration": "30s", "factor": 2, "maxDuration": "10m"}}
+    }
+  }
+}
