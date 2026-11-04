@@ -22,6 +22,7 @@
         "runtime/snapshot.mjs",
         "runtime/upstream.mjs",
         "runtime/endpoint.mjs",
+        "runtime/public-endpoint.mjs",
         "runtime/server.mjs"
       ]
     }

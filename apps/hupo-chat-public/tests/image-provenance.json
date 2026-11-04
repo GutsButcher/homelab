@@ -1,0 +1,82 @@
+{
+  "observedAt": "2026-11-04T00:00:47.003364+00:00",
+  "release": {
+    "tag_name": "2026.10.7",
+    "published_at": "2026-10-30T17:11:03Z",
+    "html_url": "https://github.com/cloudflare/cloudflared/releases/tag/2026.10.7"
+  },
+  "image": "cloudflare/cloudflared:2026.10.7@sha256:4955524aeaa379e154023d5a027c250f7b35041a2e7e950cf13f144bc9b9c5ba",
+  "registryManifestUrl": "https://registry-1.docker.io/v2/cloudflare/cloudflared/manifests/2026.10.7",
+  "registryDigestHeader": "sha256:4955524aeaa379e154023d5a027c250f7b35041a2e7e950cf13f144bc9b9c5ba",
+  "computedIndexDigest": "sha256:4955524aeaa379e154023d5a027c250f7b35041a2e7e950cf13f144bc9b9c5ba",
+  "platforms": [
+    {
+      "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
+      "size": 3829,
+      "digest": "sha256:32f933aa6fe1f69c5885b93f3c92cc3f60cca8f0530868bc3bc2cc446114a385",
+      "platform": {
+        "architecture": "amd64",
+        "os": "linux"
+      }
+    },
+    {
+      "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
+      "size": 3829,
+      "digest": "sha256:17ab7aa52b3a9805b36c81cbe353bad657fb6395d63c81e12021beaea95f03d3",
+      "platform": {
+        "architecture": "arm64",
+        "os": "linux"
+      }
+    }
+  ],
+  "tagObject": "e7817459ae22d74127a4a648adbd1aef20ac0184",
+  "commit": "872b241f94871665c1c157adefcf90c11f0ead96",
+  "imageSourceCommit": "872b241f94871665c1c157adefcf90c11f0ead96",
+  "imageSource": "https://github.com/cloudflare/cloudflared",
+  "imageUser": "65532:65532",
+  "imageEntrypoint": [
+    "cloudflared"
+  ],
+  "sources": {
+    "metrics/metrics.go": {
+      "url": "https://raw.githubusercontent.com/cloudflare/cloudflared/2026.10.7/metrics/metrics.go",
+      "sha256": "d4a49bf47768d42b1720d8e93998a7730f4868997c2f161615cb185819ea8fcf"
+    },
+    "cmd/cloudflared/tunnel/quick_tunnel.go": {
+      "url": "https://raw.githubusercontent.com/cloudflare/cloudflared/2026.10.7/cmd/cloudflared/tunnel/quick_tunnel.go",
+      "sha256": "637457fc155436876ccf51407148dc5c74c4c8117a5ad23b8647428460b8082a"
+    },
+    "cmd/cloudflared/tunnel/cmd.go": {
+      "url": "https://raw.githubusercontent.com/cloudflare/cloudflared/2026.10.7/cmd/cloudflared/tunnel/cmd.go",
+      "sha256": "43a48e4f23c95926fed216e9cb6460545e40fe45a6b00a03ad02de783ecdde24"
+    },
+    "cmd/cloudflared/tunnel/configuration.go": {
+      "url": "https://raw.githubusercontent.com/cloudflare/cloudflared/2026.10.7/cmd/cloudflared/tunnel/configuration.go",
+      "sha256": "f61515a4c69df904a35f72f2126416f8feb343f769f2633cc42cb787a62e886f"
+    },
+    "cmd/cloudflared/flags/flags.go": {
+      "url": "https://raw.githubusercontent.com/cloudflare/cloudflared/2026.10.7/cmd/cloudflared/flags/flags.go",
+      "sha256": "3edd9dfb1315e054c17a89d44d0a7cc7ed42e68aa9f7a81815d898166f684c69"
+    },
+    "logger/create.go": {
+      "url": "https://raw.githubusercontent.com/cloudflare/cloudflared/2026.10.7/logger/create.go",
+      "sha256": "9a4325cd50700530a6e4338e9a5d4946591d9190eab1b6677513405fb7911042"
+    },
+    "Dockerfile": {
+      "url": "https://raw.githubusercontent.com/cloudflare/cloudflared/2026.10.7/Dockerfile",
+      "sha256": "5abeb50eac8b8d0261a989ef14aa477c25ff8aa564e69aeee927a14a227bdbcd"
+    },
+    "cmd/cloudflared/cliutil/logger.go": {
+      "url": "https://raw.githubusercontent.com/cloudflare/cloudflared/2026.10.7/cmd/cloudflared/cliutil/logger.go",
+      "sha256": "4e867a5a01797987bc5ffd2b223b9903550910f020ee2b24111fb784d199bc6e"
+    },
+    "cmd/cloudflared/tunnel/subcommands.go": {
+      "url": "https://raw.githubusercontent.com/cloudflare/cloudflared/2026.10.7/cmd/cloudflared/tunnel/subcommands.go",
+      "sha256": "cc403280c17091dd7b9294442b4642afc00ffbab6b7fe078f36bcc65c36f71bd"
+    },
+    "connection/protocol.go": {
+      "url": "https://raw.githubusercontent.com/cloudflare/cloudflared/2026.10.7/connection/protocol.go",
+      "sha256": "a8adb832cc252397bebcd04ff3a40b37ed10d5573a1a7637f8313fcc3f377000"
+    }
+  }
+}

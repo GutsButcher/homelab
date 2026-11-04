@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { realpathSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { createHandler } from './endpoint.mjs';
+import { PublicEndpointDiscovery } from './public-endpoint.mjs';
 import { ReportCache, observe } from './snapshot.mjs';
 import { KubeReader, fetchAuthenticatedCertificate, readOwnDisk } from './upstream.mjs';
 
@@ -11,13 +12,14 @@ export class PreflightService {
 
   constructor({ plan, ownNode, provider = { reader: new KubeReader(), readDisk: readOwnDisk,
     readCert: fetchAuthenticatedCertificate, certificateSource: 'kubernetes-api-service-proxy-v1' },
-    makeServer = createServer, schedule = setInterval, cancel = clearInterval }) {
+    publicEndpoint, makeServer = createServer, schedule = setInterval, cancel = clearInterval }) {
+    this.publicEndpoint = publicEndpoint;
     this.cache = new ReportCache({ plan, clock: provider.clock || Date.now,
       collect: signal => observe(plan, ownNode, provider, signal) });
     this.schedule = schedule;
     this.cancel = cancel;
     this.server = makeServer({ requestTimeout: 5000, headersTimeout: 4000, keepAliveTimeout: 1000,
-      maxHeaderSize: 8192, connectionsCheckingInterval: 1000 }, createHandler(this.cache, { certificateSource: provider.certificateSource }));
+      maxHeaderSize: 8192, connectionsCheckingInterval: 1000 }, createHandler(this.cache, { certificateSource: provider.certificateSource, publicEndpoint }));
     this.server.maxConnections = 16;
     this.server.maxRequestsPerSocket = 10;
     this.server.on('clientError', (_error, socket) => {
@@ -29,8 +31,17 @@ export class PreflightService {
   start() {
     if (this.#timer !== null) return;
     void this.cache.refresh();
-    this.#timer = this.schedule(() => { void this.cache.refresh(); }, 20000);
+    this.#refreshPublicEndpoint();
+    this.#timer = this.schedule(() => {
+      void this.cache.refresh();
+      this.#refreshPublicEndpoint();
+    }, 20000);
     this.server.listen(8080, '0.0.0.0');
+  }
+
+  #refreshPublicEndpoint() {
+    // Optional metadata has its own deadline and never joins capacity/certificate work.
+    try { void Promise.resolve(this.publicEndpoint?.refresh()).catch(() => {}); } catch {}
   }
 
   stop() {
@@ -51,7 +62,8 @@ export function isMainModule(entrypoint, moduleUrl) {
 if (isMainModule(process.argv[1], import.meta.url)) {
   try {
     const plan = JSON.parse(await readFile(new URL('./plan.json', import.meta.url), 'utf8'));
-    const service = new PreflightService({ plan, ownNode: process.env.NODE_NAME });
+    const service = new PreflightService({ plan, ownNode: process.env.NODE_NAME,
+      publicEndpoint: new PublicEndpointDiscovery() });
     service.start();
     process.once('SIGTERM', () => { void service.stop(); });
     process.once('SIGINT', () => { void service.stop(); });

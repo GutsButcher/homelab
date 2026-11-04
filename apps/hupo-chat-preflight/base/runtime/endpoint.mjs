@@ -1,4 +1,6 @@
-export function createHandler(cache, { certificateSource } = {}) {
+import { publicEndpointHeaders } from './public-endpoint.mjs';
+
+export function createHandler(cache, { certificateSource, publicEndpoint } = {}) {
   const provenance = certificateSource === 'kubernetes-api-service-proxy-v1' ?
     { 'X-Hupo-Certificate-Source': 'kubernetes-api-service-proxy-v1' } : {};
   return (request, response) => {
@@ -6,7 +8,8 @@ export function createHandler(cache, { certificateSource } = {}) {
       return send(request, response, 405, { error: 'METHOD_NOT_ALLOWED' }, 'application/json', { Allow: 'GET, HEAD' });
     }
     if (request.url === '/healthz') return send(request, response, 200, { healthy: true });
-    if (request.url === '/report') return send(request, response, 200, cache.report());
+    if (request.url === '/report') return send(request, response, 200, cache.report(),
+      'application/json', publicEndpointHeaders(publicEndpoint));
     if (request.url === '/certificate') {
       const pem = cache.certificate();
       return pem ? send(request, response, 200, pem, 'application/x-pem-file', provenance) :

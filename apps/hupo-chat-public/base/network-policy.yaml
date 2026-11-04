@@ -1,0 +1,122 @@
+{
+  "apiVersion": "v1",
+  "kind": "List",
+  "items": [
+    {
+      "apiVersion": "networking.k8s.io/v1",
+      "kind": "NetworkPolicy",
+      "metadata": {
+        "name": "hupo-chat-public-isolation", "namespace": "hupo-chat",
+        "annotations": {"argocd.argoproj.io/sync-wave": "-10"}
+      },
+      "spec": {
+        "podSelector": {"matchLabels": {"app.kubernetes.io/name": "hupo-chat-public"}},
+        "policyTypes": ["Ingress", "Egress"],
+        "ingress": [{
+          "from": [{
+            "namespaceSelector": {"matchLabels": {"kubernetes.io/metadata.name": "hupo-chat-preflight"}},
+            "podSelector": {"matchLabels": {"app.kubernetes.io/name": "hupo-chat-preflight"}}
+          }],
+          "ports": [{"protocol": "TCP", "port": 20241}]
+        }],
+        "egress": [
+          {
+            "to": [{
+              "namespaceSelector": {"matchLabels": {"kubernetes.io/metadata.name": "kube-system"}},
+              "podSelector": {"matchLabels": {"k8s-app": "kube-dns"}}
+            }],
+            "ports": [{"protocol": "UDP", "port": 53}, {"protocol": "TCP", "port": 53}]
+          },
+          {
+            "to": [{
+              "namespaceSelector": {"matchLabels": {"kubernetes.io/metadata.name": "hupo-chat"}},
+              "podSelector": {"matchLabels": {
+                "app.kubernetes.io/name": "hupo-chat", "app.kubernetes.io/part-of": "hupo-chat",
+                "app.kubernetes.io/component": "web"
+              }}
+            }],
+            "ports": [{"protocol": "TCP", "port": 3000}]
+          },
+          {
+            "to": [
+              {"ipBlock": {"cidr": "198.41.192.167/32"}},
+              {"ipBlock": {"cidr": "198.41.192.67/32"}},
+              {"ipBlock": {"cidr": "198.41.192.57/32"}},
+              {"ipBlock": {"cidr": "198.41.192.107/32"}},
+              {"ipBlock": {"cidr": "198.41.192.27/32"}},
+              {"ipBlock": {"cidr": "198.41.192.7/32"}},
+              {"ipBlock": {"cidr": "198.41.192.227/32"}},
+              {"ipBlock": {"cidr": "198.41.192.47/32"}},
+              {"ipBlock": {"cidr": "198.41.192.37/32"}},
+              {"ipBlock": {"cidr": "198.41.192.77/32"}},
+              {"ipBlock": {"cidr": "198.41.200.13/32"}},
+              {"ipBlock": {"cidr": "198.41.200.193/32"}},
+              {"ipBlock": {"cidr": "198.41.200.33/32"}},
+              {"ipBlock": {"cidr": "198.41.200.233/32"}},
+              {"ipBlock": {"cidr": "198.41.200.53/32"}},
+              {"ipBlock": {"cidr": "198.41.200.63/32"}},
+              {"ipBlock": {"cidr": "198.41.200.113/32"}},
+              {"ipBlock": {"cidr": "198.41.200.73/32"}},
+              {"ipBlock": {"cidr": "198.41.200.43/32"}},
+              {"ipBlock": {"cidr": "198.41.200.23/32"}}
+            ],
+            "ports": [{"protocol": "TCP", "port": 7844}]
+          },
+          {
+            "to": [{"ipBlock": {
+              "cidr": "0.0.0.0/0",
+              "except": [
+                "0.0.0.0/8", "10.0.0.0/8", "100.64.0.0/10", "127.0.0.0/8",
+                "169.254.0.0/16", "172.16.0.0/12", "192.0.0.0/24", "192.0.2.0/24",
+                "192.168.0.0/16", "198.18.0.0/15", "198.51.100.0/24", "203.0.113.0/24",
+                "224.0.0.0/4", "240.0.0.0/4"
+              ]
+            }}],
+            "ports": [{"protocol": "TCP", "port": 443}]
+          }
+        ]
+      }
+    },
+    {
+      "apiVersion": "networking.k8s.io/v1",
+      "kind": "NetworkPolicy",
+      "metadata": {
+        "name": "hupo-chat-web-from-public-tunnel", "namespace": "hupo-chat",
+        "annotations": {"argocd.argoproj.io/sync-wave": "-10"}
+      },
+      "spec": {
+        "podSelector": {"matchLabels": {
+          "app.kubernetes.io/name": "hupo-chat", "app.kubernetes.io/part-of": "hupo-chat",
+          "app.kubernetes.io/component": "web"
+        }},
+        "policyTypes": ["Ingress"],
+        "ingress": [{
+          "from": [{
+            "namespaceSelector": {"matchLabels": {"kubernetes.io/metadata.name": "hupo-chat"}},
+            "podSelector": {"matchLabels": {"app.kubernetes.io/name": "hupo-chat-public"}}
+          }],
+          "ports": [{"protocol": "TCP", "port": 3000}]
+        }]
+      }
+    },
+    {
+      "apiVersion": "networking.k8s.io/v1",
+      "kind": "NetworkPolicy",
+      "metadata": {
+        "name": "hupo-chat-preflight-public-discovery", "namespace": "hupo-chat-preflight",
+        "annotations": {"argocd.argoproj.io/sync-wave": "-10"}
+      },
+      "spec": {
+        "podSelector": {"matchLabels": {"app.kubernetes.io/name": "hupo-chat-preflight"}},
+        "policyTypes": ["Egress"],
+        "egress": [{
+          "to": [{
+            "namespaceSelector": {"matchLabels": {"kubernetes.io/metadata.name": "hupo-chat"}},
+            "podSelector": {"matchLabels": {"app.kubernetes.io/name": "hupo-chat-public"}}
+          }],
+          "ports": [{"protocol": "TCP", "port": 20241}]
+        }]
+      }
+    }
+  ]
+}

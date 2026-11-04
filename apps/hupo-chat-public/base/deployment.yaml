@@ -1,0 +1,61 @@
+{
+  "apiVersion": "apps/v1",
+  "kind": "Deployment",
+  "metadata": {
+    "name": "hupo-chat-public",
+    "namespace": "hupo-chat",
+    "annotations": {"argocd.argoproj.io/sync-wave": "0"}
+  },
+  "spec": {
+    "replicas": 1,
+    "revisionHistoryLimit": 1,
+    "strategy": {"type": "Recreate"},
+    "selector": {"matchLabels": {"app.kubernetes.io/name": "hupo-chat-public"}},
+    "template": {
+      "metadata": {"labels": {"app.kubernetes.io/name": "hupo-chat-public"}},
+      "spec": {
+        "nodeSelector": {"kubernetes.io/hostname": "node01"},
+        "serviceAccountName": "hupo-chat-public",
+        "automountServiceAccountToken": false,
+        "enableServiceLinks": false,
+        "securityContext": {
+          "runAsNonRoot": true,
+          "runAsUser": 65532,
+          "runAsGroup": 65532,
+          "seccompProfile": {"type": "RuntimeDefault"}
+        },
+        "terminationGracePeriodSeconds": 20,
+        "containers": [{
+          "name": "cloudflared",
+          "image": "cloudflare/cloudflared:2026.10.7@sha256:4955524aeaa379e154023d5a027c250f7b35041a2e7e950cf13f144bc9b9c5ba",
+          "imagePullPolicy": "IfNotPresent",
+          "args": [
+            "tunnel", "--no-autoupdate", "--protocol", "http2", "--edge-ip-version", "4",
+            "--metrics", "0.0.0.0:20241", "--output", "json",
+            "--management-diagnostics=false",
+            "--url", "http://hupo-chat-web.hupo-chat.svc.cluster.local:3000"
+          ],
+          "ports": [{"name": "metrics", "containerPort": 20241, "protocol": "TCP"}],
+          "readinessProbe": {
+            "httpGet": {"path": "/ready", "port": 20241},
+            "periodSeconds": 10, "timeoutSeconds": 2, "failureThreshold": 3
+          },
+          "livenessProbe": {
+            "httpGet": {"path": "/healthcheck", "port": 20241},
+            "initialDelaySeconds": 30, "periodSeconds": 20,
+            "timeoutSeconds": 2, "failureThreshold": 3
+          },
+          "securityContext": {
+            "allowPrivilegeEscalation": false,
+            "readOnlyRootFilesystem": true,
+            "capabilities": {"drop": ["ALL"]}
+          },
+          "resources": {
+            "requests": {"cpu": "25m", "memory": "64Mi"},
+            "limits": {"cpu": "250m", "memory": "128Mi"}
+          }
+        }]
+      }
+    }
+  }
+}
