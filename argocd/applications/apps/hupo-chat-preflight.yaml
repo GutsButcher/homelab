@@ -14,13 +14,13 @@ spec:
     namespace: hupo-chat-preflight
   sources:
     - repoURL: https://github.com/GutsButcher/homelab.git
-      targetRevision: 22d5b55fc5417cdc3ed26f1a523b700d6b181471
+      targetRevision: fbca07473bb42e2f7f86ddc2a0c846d15202680a
       path: apps/hupo-chat-preflight/prod
     - repoURL: https://github.com/GutsButcher/homelab.git
-      targetRevision: 22d5b55fc5417cdc3ed26f1a523b700d6b181471
+      targetRevision: fbca07473bb42e2f7f86ddc2a0c846d15202680a
       path: apps/hupo-chat-preflight/cert-reader-access
     - repoURL: https://github.com/GutsButcher/homelab.git
-      targetRevision: 22d5b55fc5417cdc3ed26f1a523b700d6b181471
+      targetRevision: fbca07473bb42e2f7f86ddc2a0c846d15202680a
       path: apps/hupo-chat-preflight/state-reader-access
   syncPolicy:
     automated:
