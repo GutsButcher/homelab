@@ -247,7 +247,7 @@ test('nine-workload rationale requires new native and live evidence without assu
   assert.match(text, /@planner\/retry-policy.json/);
   assert.match(text, /1925m/);
   assert.match(text, /5120Mi/);
-  assert.match(text, /14336Mi/);
+  assert.match(text, /10240Mi/);
   assert.doesNotMatch(text, /must resolve additional retry|does not silently become an eleven/);
   const prepare = JSON.parse(await readFile(new URL('../../hupo-chat/base/prepare.yaml', import.meta.url), 'utf8'));
   for (const [key, value] of Object.entries({ backoffLimit: prepare.spec.backoffLimit,

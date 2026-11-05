@@ -88,12 +88,12 @@ class PhaseBudgetTests(unittest.TestCase):
 
     def test_early_jobs_do_not_raise_the_existing_conservative_peak(self):
         result = phase_inputs()
-        self.assertEqual(7680 * 1024 ** 2, result["peakMemoryLimitBytes"])
+        self.assertEqual(6656 * 1024 ** 2, result["peakMemoryLimitBytes"])
         self.assertEqual(2192 * 1024 ** 2, result["peakEmptyDirBytes"])
         self.assertEqual(42 * 1024 ** 3, result["pvcBytes"])
         for name in ("prepare_first_install", "owner_first_install"):
             phase = next(item for item in result["phases"] if item["name"] == name)
-            self.assertEqual(3584 * 1024 ** 2, phase["limits"]["memoryBytes"])
+            self.assertEqual(2560 * 1024 ** 2, phase["limits"]["memoryBytes"])
         self.assertTrue(all(len([member for member in phase["workloads"] if member in
                                 ("hupo-chat-prepare", "hupo-chat-owner-bootstrap", "hupo-chat-namespace-secrets")]) <= 1
                             for phase in result["phases"]))

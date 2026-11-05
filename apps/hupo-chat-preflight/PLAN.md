@@ -1,6 +1,6 @@
 # Generated source budget
 
-Source: `homelab/apps/hupo-chat/base (JSON manifests)`; relevant source SHA-256: `175d7b412699d7fd1a4610bc0be672ec98e5f0b49f4b6e04bfc88f6dbda87892`.
+Source: `homelab/apps/hupo-chat/base (JSON manifests)`; relevant source SHA-256: `8c34f2a1947c1b3405e7d71b4f9b16d534d33bab3b6ee85a3d2903884b6327a6`.
 
 **Source budget only.** No live capacity result or deployment acceptance is established by generation. All nine reviewed workloads are budgeted concurrently. The selected declared-retry reservation is eleven planned pods for nine workload rows. Older seven-workload evidence does not accept this nine-workload revision; older nine-pod evidence does not accept the new retry policy either. Before auxiliary activation, the exact new preflight source must pass native Node 24 tests, then a fresh matching live snapshot must pass all eight checks. No older snapshot accepts changed source bytes. Main application health remains unobserved by this source check.
 
@@ -8,15 +8,15 @@ Source: `homelab/apps/hupo-chat/base (JSON manifests)`; relevant source SHA-256:
 | --- | ---: | ---: | ---: | ---: |
 | hupo-chat-cluster-verification | 1 | 25m | 64Mi | 192Mi |
 | hupo-chat-namespace-secrets | 1 | 25m | 64Mi | 192Mi |
-| hupo-chat-owner-bootstrap | 1 | 250m | 768Mi | 2048Mi |
+| hupo-chat-owner-bootstrap | 1 | 250m | 768Mi | 1024Mi |
 | hupo-chat-postgres | 1 | 250m | 256Mi | 1024Mi |
-| hupo-chat-prepare | 3 | 750m | 2304Mi | 6144Mi |
+| hupo-chat-prepare | 3 | 750m | 2304Mi | 3072Mi |
 | hupo-chat-public | 1 | 25m | 64Mi | 128Mi |
 | hupo-chat-redis | 1 | 100m | 64Mi | 512Mi |
 | hupo-chat-web | 1 | 250m | 768Mi | 2048Mi |
 | hupo-chat-worker | 1 | 250m | 768Mi | 2048Mi |
 
-Totals: **1925m CPU requests**, **5120Mi memory requests**, **14336Mi memory limits**.
+Totals: **1925m CPU requests**, **5120Mi memory requests**, **10240Mi memory limits**.
 
 Declared app PVCs: 45097156608 bytes; declared emptyDir bounds: 4311764992 bytes; explicit disk reserve: 10737418240 bytes. Required available bytes on the own local-path PVC filesystem: **60146339840** (56.016 GiB).
 

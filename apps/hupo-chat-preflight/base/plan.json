@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "revision": "175d7b412699d7fd1a4610bc0be672ec98e5f0b49f4b6e04bfc88f6dbda87892",
+  "revision": "8c34f2a1947c1b3405e7d71b4f9b16d534d33bab3b6ee85a3d2903884b6327a6",
   "targetNode": "node01",
   "source": "homelab/apps/hupo-chat/base (JSON manifests)",
   "workloads": [
@@ -30,7 +30,7 @@
       "replicas": 1,
       "cpuRequestsNanocores": "250000000",
       "memoryRequestsBytes": "805306368",
-      "memoryLimitsBytes": "2147483648",
+      "memoryLimitsBytes": "1073741824",
       "storageBytes": "0",
       "emptyDirBytes": "671088640"
     },
@@ -50,7 +50,7 @@
       "replicas": 3,
       "cpuRequestsNanocores": "750000000",
       "memoryRequestsBytes": "2415919104",
-      "memoryLimitsBytes": "6442450944",
+      "memoryLimitsBytes": "3221225472",
       "storageBytes": "0",
       "emptyDirBytes": "2013265920"
     },
@@ -98,7 +98,7 @@
   "totals": {
     "cpuRequestsNanocores": "1925000000",
     "memoryRequestsBytes": "5368709120",
-    "memoryLimitsBytes": "15032385536",
+    "memoryLimitsBytes": "10737418240",
     "pvcBytes": "45097156608",
     "emptyDirBytes": "4311764992"
   },

@@ -39,6 +39,10 @@ class SourceIntegrityTests(unittest.TestCase):
 
     def test_owner_job_preserves_the_reviewed_runtime_contract(self):
         owner = json.loads((ROOT / "base/owner-bootstrap.yaml").read_text(encoding="utf-8"))
+        limits = owner["spec"]["template"]["spec"]["containers"][0]["resources"]["limits"]
+        self.assertEqual("1Gi", limits["memory"])
+        # Only the small-trial cap differs from the historical runtime envelope.
+        limits["memory"] = "2Gi"
         owner["metadata"].pop("annotations")
         owner["spec"]["template"]["spec"].pop("nodeSelector")
         raw = json.dumps(owner, sort_keys=True, separators=(",", ":")).encode()

@@ -52,7 +52,7 @@
       },
       "limits": {
         "cpuMilli": 3500,
-        "memoryBytes": 3758096384
+        "memoryBytes": 2684354560
       },
       "emptyDirBytes": 956301312
     },
@@ -70,7 +70,7 @@
       },
       "limits": {
         "cpuMilli": 3500,
-        "memoryBytes": 3758096384
+        "memoryBytes": 2684354560
       },
       "emptyDirBytes": 956301312
     },
@@ -129,7 +129,7 @@
       },
       "limits": {
         "cpuMilli": 7500,
-        "memoryBytes": 8053063680
+        "memoryBytes": 6979321856
       },
       "emptyDirBytes": 2298478592
     },
@@ -149,11 +149,11 @@
       },
       "limits": {
         "cpuMilli": 7500,
-        "memoryBytes": 8053063680
+        "memoryBytes": 6979321856
       },
       "emptyDirBytes": 2298478592
     }
   ],
-  "peakMemoryLimitBytes": 8053063680,
+  "peakMemoryLimitBytes": 6979321856,
   "peakEmptyDirBytes": 2298478592
 }

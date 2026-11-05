@@ -518,15 +518,17 @@ test('prepare reserves three complete copies while nine reviewed workloads requi
   const prepare = plan.workloads.find(row => row.name === 'hupo-chat-prepare');
   assert.deepEqual(prepare, { name: 'hupo-chat-prepare', kind: 'Job', replicas: 3,
     cpuRequestsNanocores: '750000000', memoryRequestsBytes: String(2304n * 1024n ** 2n),
-    memoryLimitsBytes: String(6144n * 1024n ** 2n), storageBytes: '0', emptyDirBytes: String(1920n * 1024n ** 2n) });
+    memoryLimitsBytes: String(3072n * 1024n ** 2n), storageBytes: '0', emptyDirBytes: String(1920n * 1024n ** 2n) });
   assert.ok(plan.workloads.filter(row => row !== prepare).every(row => row.replicas === 1));
   assert.deepEqual(plan.totals, { cpuRequestsNanocores: '1925000000', memoryRequestsBytes: '5368709120',
-    memoryLimitsBytes: '15032385536', pvcBytes: '45097156608', emptyDirBytes: '4311764992' });
+    memoryLimitsBytes: '10737418240', pvcBytes: '45097156608', emptyDirBytes: '4311764992' });
   assert.equal(BigInt(plan.totals.pvcBytes) + BigInt(plan.totals.emptyDirBytes) + BigInt(plan.reserves.diskBytes), 60146339840n);
   assert.deepEqual(plan.reserves, canonical.reserves, 'retries must not spend any safety reserve');
   const input = inputs();
   input.node.status.allocatable.memory = '16Gi';
-  input.metrics.usage.memory = '2Gi';
+  input.metrics.usage.memory = '5Gi';
+  assert.equal(evaluate(input, plan, 'node01', now).memoryUsage, true, 'exact conservative boundary fits');
+  input.metrics.usage.memory = '6Gi';
   assert.equal(evaluate(input, plan, 'node01', now).memoryUsage, false, 'the eleven-pod budget must not fabricate 16Gi headroom');
   input.node.status.allocatable.pods = '10';
   assert.equal(evaluate(input, plan, 'node01', now).podSlots, false);
@@ -560,6 +562,13 @@ test('frozen nine-pod raw inputs cannot reuse their revision for the selected el
   const fixture = await auxiliaryFixture(t);
   await fixture.putAuxiliary(fixture.jobPath, fixture.job);
   await fixture.putAuxiliary(fixture.tunnelPath, fixture.tunnel);
+  // Keep historical raw bytes fixed independently of the current trial sizing.
+  for (const name of ['prepare.yaml', 'owner-bootstrap.yaml']) {
+    const path = join(fixture.source, name);
+    const raw = await readFile(path, 'utf8');
+    assert.equal(raw.split('"memory": "1Gi"').length, 2);
+    await writeFile(path, raw.replace('"memory": "1Gi"', '"memory": "2Gi"'));
+  }
   // Restore only the three pre-rlimit commands to reproduce the reviewed v1 raw bytes.
   const oldJob = (await readFile(new URL('../../hupo-chat-verification/base/job.yaml', import.meta.url), 'utf8'))
     .replaceAll('Process.setrlimit(Process::RLIMIT_NPROC, 64, 64); ', '')
